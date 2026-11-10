@@ -1,0 +1,13 @@
+diff --git a/scripts/build-bootstraps.sh b/scripts/build-bootstraps.sh
+index 53bb59d..0edcaf6 100755
+--- a/scripts/build-bootstraps.sh
++++ b/scripts/build-bootstraps.sh
+@@ -429,7 +429,7 @@ main() {
+ 
+ 		# Core utilities.
+ 		PACKAGES+=("bash") # Used by `termux-bootstrap-second-stage.sh`
+-		PACKAGES+=("bzip2")
++		PACKAGES+=("libbz2") # FoldCode: the bzip2 tools are a subpackage of libbz2 now
+ 		if ! ${BOOTSTRAP_ANDROID10_COMPATIBLE}; then
+ 			PACKAGES+=("command-not-found")
+ 		else
