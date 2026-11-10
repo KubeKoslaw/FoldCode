@@ -6,9 +6,12 @@ set -euo pipefail
 fail=0
 added="$(git diff --cached -U0 --no-color --diff-filter=ACMR | grep -E '^\+[^+]' || true)"
 
-check() { # check <description> <extended regex>
+check() { # check <description> <extended regex> [allowed regex]
     local hits
     hits="$(printf '%s\n' "$added" | grep -n -E "$2" || true)"
+    if [ -n "$hits" ] && [ -n "${3-}" ]; then
+        hits="$(printf '%s\n' "$hits" | grep -v -E "$3" || true)"
+    fi
     if [ -n "$hits" ]; then
         echo "pre-commit: blocked — $1:" >&2
         printf '%s\n' "$hits" | head -n 5 >&2
@@ -18,7 +21,8 @@ check() { # check <description> <extended regex>
 
 check "private key material" 'BEGIN [A-Z ]*PRIVATE KEY'
 check "LAN IP address" '\b(192\.168|10\.[0-9]{1,3}\.[0-9]{1,3}|172\.(1[6-9]|2[0-9]|3[01]))\.[0-9]{1,3}\b'
-check "local home path" '/home/[a-z_][a-z0-9_-]*/'
+# /home/builder is the termux-packages Docker container's user, not a local account.
+check "local home path" '/home/[a-z_][a-z0-9_-]*/' '/home/builder/'
 check "personal e-mail address" '[A-Za-z0-9._%+-]+@(gmail|googlemail|outlook|hotmail|yahoo|wp|o2|onet|interia)\.[a-z.]+'
 check "GitHub token" '(ghp|gho|ghs|ghu|github_pat)_[A-Za-z0-9_]{20,}'
 

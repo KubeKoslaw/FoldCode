@@ -71,7 +71,8 @@ class Runtime(private val ctx: Context) {
 
         val second = File(prefix, "etc/termux/termux-bootstrap/second-stage/termux-bootstrap-second-stage.sh")
         if (second.exists()) {
-            val r = run(listOf(second.path), timeoutSec = 300)
+            // The script isn't marked executable in the zip; the Termux app also runs it through a shell.
+            val r = run(listOf("${prefix.path}/bin/bash", second.path), timeoutSec = 300)
             log("second stage exit=${r.exit}\n${r.output.trim()}")
             require(r.exit == 0) { "bootstrap second stage failed" }
         } else {

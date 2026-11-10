@@ -1,0 +1,24 @@
+diff --git a/packages/termux-tools/build.sh b/packages/termux-tools/build.sh
+index d455854..70d8008 100644
+--- a/packages/termux-tools/build.sh
++++ b/packages/termux-tools/build.sh
+@@ -4,7 +4,7 @@ TERMUX_PKG_LICENSE="GPL-3.0"
+ TERMUX_PKG_MAINTAINER="@termux"
+ TERMUX_PKG_GENERATE_REPOLOGY_METADATA=false
+ TERMUX_PKG_VERSION="1.46.0+really1.45.0"
+-TERMUX_PKG_REVISION=1
++TERMUX_PKG_REVISION=2
+ TERMUX_PKG_SRCURL=https://github.com/termux/termux-tools/archive/refs/tags/v1.45.0.tar.gz
+ TERMUX_PKG_SHA256=1ae29b1b875d95cc626dae323b45a2ace759969862d96094b2fa6d13bffe20d2
+ TERMUX_PKG_ESSENTIAL=true
+@@ -23,6 +23,10 @@ TERMUX_PKG_DEPENDS="bzip2, coreutils, curl, dash, diffutils, findutils, gawk, gr
+ TERMUX_PKG_RECOMMENDS="ed, dos2unix, inetutils, net-tools, patch, unzip"
+ 
+ termux_step_pre_configure() {
++	# FoldCode: configure reads these from the environment and silently falls back to
++	# /data/data/com.termux when they are not exported.
++	export TERMUX_APP_PACKAGE="$TERMUX_APP__PACKAGE_NAME" TERMUX_BASE_DIR="$TERMUX__ROOTFS" \
++		TERMUX_CACHE_DIR TERMUX_PREFIX TERMUX_ANDROID_HOME TERMUX_PACKAGE_FORMAT TERMUX_PACKAGE_MANAGER
+ 	autoreconf -vfi
+ }
+ 

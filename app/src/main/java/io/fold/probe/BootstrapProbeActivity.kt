@@ -117,7 +117,8 @@ class BootstrapProbeActivity : Activity() {
             echo "prefix   ${'$'}PREFIX   home ${'$'}HOME"
             for c in apt dpkg git ssh rg node python3 php clang; do
                 if command -v "${'$'}c" >/dev/null 2>&1; then
-                    printf '%-8s %s\n' "${'$'}c" "${'$'}(${'$'}c --version 2>&1 | head -n1)"
+                    v=--version; [ "${'$'}c" = ssh ] && v=-V
+                    printf '%-8s %s\n' "${'$'}c" "${'$'}(${'$'}c ${'$'}v 2>&1 | head -n1)"
                 else
                     printf '%-8s %s\n' "${'$'}c" "(not installed)"
                 fi

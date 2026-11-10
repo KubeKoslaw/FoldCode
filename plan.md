@@ -195,10 +195,10 @@ scripts/serve-repo.sh           # serve out/repo to the phone over adb reverse
 
 ### Phase 1 — Package toolchain (Docker)
 - [x] Clone termux-packages (pinned), set `TERMUX_APP__PACKAGE_NAME=io.fold`. Path limits: `/data/data/io.fold` is 17 characters against a 69 limit, fine
-- [ ] Build the core set in Docker (`scripts/build-bootstrap.sh`): Termux's default bootstrap (bash, coreutils, apt/dpkg, termux-tools/`pkg`, termux-exec…) + git, openssh, ripgrep → `out/bootstrap/bootstrap-aarch64.zip`
-- [ ] Bootstrap installer in the app (`io.fold.runtime.Runtime`): extract, permissions, symlinks, second stage, apt config. Test it on the phone with `BootstrapProbeActivity`
+- [x] Build the core set in Docker (`scripts/build-bootstrap.sh`): Termux's default bootstrap (bash, coreutils, apt/dpkg, termux-tools/`pkg`, termux-exec…) + git, openssh, ripgrep → `out/bootstrap/bootstrap-aarch64.zip`
+- [x] Bootstrap installer in the app (`io.fold.runtime.Runtime`): extract, permissions, symlinks, second stage, apt config. Test it on the phone with `BootstrapProbeActivity`
 - [x] Repo signing key (`scripts/repo-key.sh`) and repo generator (`scripts/make-apt-repo.py`: flat pool, Packages, signed InRelease, no dpkg needed on the host)
-- [ ] Dev repo on the phone: `scripts/serve-repo.sh` (localhost + `adb reverse`), then `apt update` / `apt install` from it
+- [x] Dev repo on the phone: `scripts/serve-repo.sh` (localhost + `adb reverse`), then `apt update` / `apt install` from it
 - [ ] nodejs-lts into the repo and the bootstrap
 - [ ] Public package hosting: a separate public GitHub repo for the apt repo (the code repo stays private)
 - [ ] Language packs: php + composer, sqlite, mariadb, postgresql, python, clang/lldb/cmake/ninja/make/gdb, rust + rust-analyzer, golang, gh, plus the `fold-*` meta packages
@@ -307,3 +307,48 @@ With `FLAG_ALT_FOCUSABLE_IM`, the system keyboard stayed hidden in all 68 checks
 - Raw results: `out/phase0/<device>/` (git-ignored) (`device-report.txt`, `system.txt`, `kbd-spike-*.log`, `fold-probe.log`).
 
 **Phase 0 is done.** Next is phase 1, the package toolchain.
+
+---
+
+## 9. Phase 1 findings
+
+### Upstream termux-packages problems hit with a custom package name (2026-11-10)
+
+All fixed by patches in `packages/patches/`:
+
+| Patch | Problem | Effect without the fix |
+|---|---|---|
+| `0003` | `build-bootstraps.sh` still lists `bzip2`, which is now a subpackage of `libbz2` | Build stops |
+| `0004` | `apr-util` 1.6.5 was removed from `downloads.apache.org` (a git build dependency) | Build stops. The fix uses `archive.apache.org`; same file, SHA256 checked |
+| `0005` | termux-tools' `configure` reads `TERMUX_PREFIX`/`TERMUX_APP_PACKAGE` from the environment, but the build system doesn't export them | `pkg`, `login`, `chsh`, `termux-setup-storage`, motd and a profile.d script silently use `/data/data/com.termux`. Official Termux never notices, because there that's the right path |
+
+`build-bootstraps.sh` has two more problems, so it's only used to compile now:
+- It writes `TERMUX_PACKAGE_MANAGER=""` into the second-stage script, so package postinst scripts are skipped.
+- It packs **every** built `.deb`, build-only dependencies included: 146 MB with python3, perl and subversion.
+
+The zip itself comes from `generate-bootstraps.sh --repository <our repo>`, which takes only the listed packages and their runtime dependencies.
+
+`scripts/check-prefix-leaks.sh` now fails the build if any script or binary in the bootstrap still contains `/data/data/com.termux`. It ignores comments, docs, headers and tests.
+
+### First bootstrap on the Magic V3
+
+This was the oversized build-bootstraps zip, before the fixes above. The slim bootstrap's results follow below.
+- Install: 18,837 files and 2,922 symlinks extracted by `Runtime.installBootstrap`.
+- Working: bash 5.3, apt 2.8.4, dpkg 1.22, git 2.56 (init and commit), ripgrep 15.2, ssh-keygen (ed25519), and `#!/usr/bin/env` scripts through termux-exec (`LD_PRELOAD=libtermux-exec-ld-preload.so`).
+- `apt update` against the signed dev repo works through `adb reverse`, with InRelease verified by our key.
+- Starting the second stage directly fails with "Permission denied", because the script isn't executable in the zip. It now runs through bash.
+
+### Slim bootstrap on the Magic V3 (2026-11-10)
+
+Built from the repo by `generate-bootstraps.sh`, leak-checked.
+
+| | First zip | Slim zip |
+|---|---|---|
+| Size | 146 MB, 177 packages | **52 MB, 94 packages** |
+| Install time | — | **7.6 s** (4,556 files, 1,446 symlinks) |
+| Second stage | skipped postinst | **exit 0, postinst ran** |
+
+- **Second stage details:** `update-alternatives` set up the pager and editor, openssh generated host keys, and termux-exec picked `libtermux-exec-direct-ld-preload.so` for API 37.
+- **`apt install make sqlite` from the dev repo works:** sqlite 3.54.1 and make 4.4.1.
+- **Everything that worked on the first zip still works:** bash 5.3, git 2.56, OpenSSH 10.6, ripgrep 15.2, shebangs and `apt update`. The phone has 96 packages after the install.
+- **Runtime:** the second stage now runs through `bash` and exits 0.
