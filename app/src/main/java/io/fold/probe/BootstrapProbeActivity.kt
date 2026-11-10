@@ -132,6 +132,14 @@ class BootstrapProbeActivity : Activity() {
             echo "rg       ${'$'}(printf 'foo\nbar\n' | rg -c bar 2>&1) match"
             echo "ssh-keygen ${'$'}(ssh-keygen -t ed25519 -N '' -q -f "${'$'}TMPDIR/k" <<<y >/dev/null 2>&1 && echo ok || echo FAIL)"
             echo "second-stage lock: ${'$'}(ls -la ${'$'}PREFIX/etc/termux/termux-bootstrap/second-stage/ 2>/dev/null | grep -c lock)"
+            if command -v node >/dev/null 2>&1; then
+                echo "node     ${'$'}(node -e 'console.log(process.version, process.platform, process.arch)' 2>&1)"
+                echo "npm      ${'$'}(npm --version 2>&1)"
+                node -e "const h=require('http');h.createServer((q,s)=>s.end('ok')).listen(0,'127.0.0.1',function(){h.get('http://127.0.0.1:'+this.address().port,r=>r.on('data',d=>{console.log('node     http server '+d);process.exit(0)}))})" 2>&1
+                (rm -rf "${'$'}TMPDIR/npmtest" && mkdir -p "${'$'}TMPDIR/npmtest" && cd "${'$'}TMPDIR/npmtest" && npm init -y >/dev/null 2>&1 \
+                    && npm install --no-audit --no-fund is-number@7 >/dev/null 2>&1 \
+                    && echo "npm      install ok: ${'$'}(node -e "console.log(require('is-number')(5))")") || echo "npm      install FAILED"
+            fi
             echo "apt update:"; apt-get update -q 2>&1 | tail -n 4 | sed 's/^/  /'
             echo "apt policy: ${'$'}(apt-cache policy 2>/dev/null | grep -c 127.0.0.1) FoldCode source(s)"
         """.trimIndent()
