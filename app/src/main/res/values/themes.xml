@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#FF1E1E1E</color>
+    <color name="surface">#FF252526</color>
+    <color name="surface2">#FF333337</color>
+    <color name="text">#FFD4D4D4</color>
+    <color name="text2">#FF9DA0A6</color>
+    <color name="accent">#FF3794FF</color>
+    <color name="good">#FF4EC9B0</color>
+    <color name="bad">#FFF14C4C</color>
+    <color name="hinge">#80F14C4C</color>
+
+    <string name="app_name">FoldCode</string>
+
+    <style name="Theme.Fold" parent="android:Theme.Material.NoActionBar">
+        <item name="android:colorPrimary">@color/surface</item>
+        <item name="android:colorPrimaryDark">@color/bg</item>
+        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:colorBackground">@color/bg</item>
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:textColorPrimary">@color/text</item>
+        <item name="android:textColorSecondary">@color/text2</item>
+        <item name="android:statusBarColor">@color/bg</item>
+        <item name="android:navigationBarColor">@color/bg</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+    </style>
+</resources>

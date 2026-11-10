@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# The repository has a single author: no co-author trailers or tool-generated footers in messages.
+set -euo pipefail
+
+if grep -i -E '^(co-authored-by|generated[- ]by|signed-off-by):|generated with' "$1" >/dev/null; then
+    echo "commit-msg: blocked — remove co-author / generated-by lines from the message" >&2
+    exit 1
+fi

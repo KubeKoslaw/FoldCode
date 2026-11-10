@@ -1,0 +1,17 @@
+diff --git a/scripts/run-docker.sh b/scripts/run-docker.sh
+index a20a22e..8053907 100755
+--- a/scripts/run-docker.sh
++++ b/scripts/run-docker.sh
+@@ -163,6 +163,12 @@ __change_builder_uid_gid() {
+ }
+ 
+ __change_container_pid_max() {
++	# FoldCode: only aarch64 is built, which never needs proot-run 32-bit executables,
++	# and the upstream fallback may change pid_max on the host with sudo. Skip it.
++	if [ -z "${FOLDCODE_ALLOW_PID_MAX_CHANGE-}" ]; then
++		echo "FoldCode: leaving /proc/sys/kernel/pid_max unchanged"
++		return 0
++	fi
+ 	if [ "$UNAME" != Darwin ]; then
+ 		echo "Changing /proc/sys/kernel/pid_max to 65535 for packages that need to run native executables using proot (for 32-bit architectures)"
+ 		if [[ "$($SUDO docker exec $CONTAINER_NAME cat /proc/sys/kernel/pid_max)" -le 65535 ]]; then

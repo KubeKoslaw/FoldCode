@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
+<title>Keyboard spike</title>
+<link rel="stylesheet" href="vendor/xterm/xterm.css">
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: #1e1e1e; color: #d4d4d4; font: 13px system-ui, sans-serif; }
+  body { display: flex; flex-direction: column; }
+  #bar { padding: 4px 8px; font: 12px monospace; color: #9da0a6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #monaco { flex: 5; min-height: 120px; border-top: 1px solid #333; }
+  #term { flex: 3; min-height: 80px; padding: 4px; background: #000; }
+  #plainRow { padding: 6px 8px; display: flex; gap: 8px; align-items: center; }
+  #plain { flex: 1; background: #252526; color: #d4d4d4; border: 1px solid #3794ff; border-radius: 4px; padding: 6px; font: 14px monospace; }
+  #events { flex: 2; min-height: 60px; overflow: auto; margin: 0; padding: 4px 8px; font: 11px monospace; color: #9da0a6; background: #252526; }
+  .t { color: #4ec9b0; } .u { color: #f14c4c; }
+</style>
+</head>
+<body>
+  <div id="bar">loading…</div>
+  <div id="monaco"></div>
+  <div id="term"></div>
+  <div id="plainRow"><label for="plain">input</label><input id="plain" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
+  <pre id="events"></pre>
+  <script src="vendor/xterm/xterm.js"></script>
+  <script src="vendor/monaco/vs/loader.js"></script>
+  <script src="spike.js"></script>
+</body>
+</html>
