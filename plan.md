@@ -228,7 +228,8 @@ scripts/serve-repo.sh           # serve out/repo to the phone over adb reverse
 - [x] `MainActivity`: full-screen workbench WebView. Outside links open in the browser, file chooser for uploads, Back leaves the app without stopping VS Code, no reload on fold/unfold. Probes moved to the launcher long-press "Diagnostics"
 - [x] Clipboard bridge (`HostBridge`): `navigator.clipboard` goes to Android's ClipboardManager over a WebMessageListener limited to the backend's origin
 - [x] Publish: bootstrap now includes code-server (260 MB, 107 packages); `scripts/publish-packages.sh` uploads the repo and bootstrap and writes `app/bootstrap.properties`
-- [ ] Fresh-install test on the phone (needs your OK)
+- [x] Fresh-install test on the phone: uninstall, install, launch, VS Code ready in **43 s** (results in §11)
+- [ ] Notifications: MagicOS blocks them for this app by default and never asks (targetSdk 28 can't request them). Add an in-app "Enable notifications" banner that opens the app's notification settings
 - [ ] Downloads from VS Code (blob URLs) and `window.open`
 - [ ] Trim the bootstrap: the Copilot SDK binaries for other platforms (~170 MB unpacked)
 - [ ] RecoveryTerminal (terminal-view)
@@ -424,3 +425,26 @@ The core toolchain for phase 2 (Node + npm on bionic) is in place.
 - Hide the AI chat panel by default (`chat.disableAIFeatures` / secondary sidebar hidden); terminal CLI agents are unaffected.
 - Default to a dark theme and skip the Welcome page.
 - Touch-friendly sizes (§3).
+
+---
+
+## 11. Phase 3 findings
+
+### Fresh install on the Magic V3 (2026-11-11)
+
+Uninstalled FoldCode, installed the new APK, launched it. No PC was involved after the install (no adb reverse, no dev repo).
+
+| Step | Result |
+|---|---|
+| Download + install + backend start | **43 s** from launch to `HTTP server listening`: 260 MB bootstrap from GitHub Releases, SHA-256 verified, installed |
+| Workbench | Opens full screen on the outer screen with the `projects` folder; extension host launched |
+| Theme | **Dark**, matching Android's dark mode (`window.autoDetectColorScheme` + WebView force-dark in web-theme-only mode) |
+| AI chat panel | Hidden; the right side is the empty editor area |
+| Restricted Mode / Welcome page | Neither shown |
+| Background service | Running (`isForeground=true`) |
+| Notification | **Not visible**: MagicOS set `POST_NOTIFICATIONS` to denied/importance NONE without prompting |
+
+Notes:
+- VS Code rewrote the theme names in `settings.json` (`Default Dark Modern` → `Dark Modern`), which confirms it read our defaults.
+- On MagicOS, `Log.i` lines from the app don't show up in `adb logcat`. Diagnose from files (`files/logs/code-server.log`, the probes' logs) instead.
+- Before publishing, the bootstrap on GitHub was checked from the PC: Range/206 resume, `InRelease` signature, `Packages` hash, and a byte-identical bootstrap (SHA-256 `1daa5a20…`).
