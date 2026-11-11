@@ -11,7 +11,7 @@ set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 tp="$root/third_party/termux-packages"
-EXTRA="${EXTRA:-git,openssh,ripgrep,nodejs-lts}"
+EXTRA="${EXTRA:-git,openssh,ripgrep,nodejs-lts,npm}"
 
 "$root/scripts/setup-termux-packages.sh"
 mkdir -p "$root/out/build" "$root/out/bootstrap" "$root/out/debs"

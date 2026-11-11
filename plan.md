@@ -199,7 +199,7 @@ scripts/serve-repo.sh           # serve out/repo to the phone over adb reverse
 - [x] Bootstrap installer in the app (`io.fold.runtime.Runtime`): extract, permissions, symlinks, second stage, apt config. Test it on the phone with `BootstrapProbeActivity`
 - [x] Repo signing key (`scripts/repo-key.sh`) and repo generator (`scripts/make-apt-repo.py`: flat pool, Packages, signed InRelease, no dpkg needed on the host)
 - [x] Dev repo on the phone: `scripts/serve-repo.sh` (localhost + `adb reverse`), then `apt update` / `apt install` from it
-- [ ] nodejs-lts into the repo and the bootstrap
+- [ ] nodejs-lts + npm into the repo and the bootstrap (node verified on the phone; npm added, phone test pending)
 - [ ] Public package hosting: a separate public GitHub repo for the apt repo (the code repo stays private)
 - [ ] Language packs: php + composer, sqlite, mariadb, postgresql, python, clang/lldb/cmake/ninja/make/gdb, rust + rust-analyzer, golang, gh, plus the `fold-*` meta packages
 
@@ -352,3 +352,12 @@ Built from the repo by `generate-bootstraps.sh`, leak-checked.
 - **`apt install make sqlite` from the dev repo works:** sqlite 3.54.1 and make 4.4.1.
 - **Everything that worked on the first zip still works:** bash 5.3, git 2.56, OpenSSH 10.6, ripgrep 15.2, shebangs and `apt update`. The phone has 96 packages after the install.
 - **Runtime:** the second stage now runs through `bash` and exits 0.
+
+### Node.js on the Magic V3 (2026-11-11)
+
+Bootstrap with `nodejs-lts`: 85 MB, installs in 4.9 s (5,139 files). Node.js **24.22.2** built in about 39 minutes.
+
+- `node` runs as `v24.22.2 android arm64`. A local HTTP server on 127.0.0.1 works, which is what code-server needs.
+- **npm was missing.** In this termux-packages version npm is a separate `npm` package (12.2.2) that nodejs-lts only *recommends*, so the bootstrap left it out. It's now added to the bootstrap list. `corepack` (for pnpm/yarn) is part of nodejs-lts.
+- **Patch `0006`:** `generate-bootstraps.sh` always took the first alternative of `a | b` dependencies. For npm (`nodejs | nodejs-lts`) that's `nodejs`, which isn't built. It now picks the first alternative that exists in the repo.
+- **Open for phase 2:** check which Node major version code-server needs (22 or 24) before building it.

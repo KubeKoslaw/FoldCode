@@ -1,0 +1,27 @@
+diff --git a/scripts/generate-bootstraps.sh b/scripts/generate-bootstraps.sh
+index 825f2a8..61b8d7b 100755
+--- a/scripts/generate-bootstraps.sh
++++ b/scripts/generate-bootstraps.sh
+@@ -129,7 +129,21 @@ pull_package() {
+ 		local package_dependencies
+ 		package_dependencies=$(
+ 			while read -r token; do
+-				echo "$token" | cut -d'|' -f1 | sed -E 's@\(.*\)@@'
++				# FoldCode: for "a | b" take the first alternative that is in the repo
++				# (upstream always took the first one, e.g. nodejs for npm's "nodejs | nodejs-lts").
++				local chosen="" alt
++				local -a alts
++				IFS='|' read -ra alts <<< "$token"
++				for alt in "${alts[@]}"; do
++					alt="$(echo "$alt" | sed -E 's@\(.*\)@@' | xargs)"
++					[ -n "$alt" ] || continue
++					if [ -e "${BOOTSTRAP_PKGDIR}/${alt}" ] || [ -n "${PACKAGE_METADATA[$alt]-}" ]; then
++						chosen="$alt"
++						break
++					fi
++				done
++				[ -n "$chosen" ] || chosen="$(echo "$token" | cut -d'|' -f1 | sed -E 's@\(.*\)@@')"
++				echo "$chosen"
+ 			done < <(echo "${PACKAGE_METADATA[${package_name}]}" | grep -i "^Depends:" | sed -E 's@^[Dd]epends:@@' | tr ',' '\n')
+ 		)
+ 
