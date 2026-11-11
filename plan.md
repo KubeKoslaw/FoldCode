@@ -5,9 +5,11 @@ VS Code running natively on Android as an APK, tuned for the **Honor Magic V3** 
 The "port" works like this. VS Code's desktop shell is Electron, and Electron doesn't run on Android. VS Code itself is split into two halves, though:
 
 - the **workbench** (the whole UI: Monaco editor, sidebar, terminal view, extensions UI) is web code, and
-- the **server** (Node.js, extension host, terminal processes, file system, git) is a normal program.
+- the **backend** (Node.js, extension host, terminal processes, file system, git) is a normal program.
 
-vscode.dev and Remote-SSH already use this split. FoldCode keeps both halves on the phone. The server runs natively on Android's own libc (bionic), with no proot and no VM, in the app's own Linux prefix. The workbench runs in Android System WebView. A native Kotlin shell around them handles the fold, the touch keyboard and app lifecycle.
+Desktop VS Code works the same way (Electron = a Chromium window + Node.js processes talking locally). vscode.dev and Remote-SSH already use this split. FoldCode keeps both halves on the phone. The backend runs natively on Android's own libc (bionic), with no proot and no VM, in the app's own Linux prefix. The workbench runs in Android System WebView. A native Kotlin shell around them handles the fold, the touch keyboard and app lifecycle.
+
+**The backend is not a remote server.** It is a process inside the APK, reachable only on 127.0.0.1 with a random per-launch password. No PC, network or second app is involved; the PC-side apt repo exists only during development.
 
 ---
 
@@ -57,8 +59,8 @@ vscode.dev and Remote-SSH already use this split. FoldCode keeps both halves on 
 │  │  + host bridge + touch layer   │  └────────────────────────┘                         │
 │  └───────────────────────────────┘                                                      │
 │  CodeKeyboard (native)  ExtraKeysBar  PostureController (Jetpack WindowManager + hinge) │
-│  SetupActivity (bootstrap unpack)     RecoveryTerminal (terminal-view, if server fails) │
-│  ServerService (foreground) ──spawns──► node code-server --bind 127.0.0.1:<random>      │
+│  SetupActivity (bootstrap unpack)     RecoveryTerminal (terminal-view, if backend fails) │
+│  BackendService (foreground) ──spawns──► node code-server --bind 127.0.0.1:<random>      │
 └─────────────────────────────────────────────┬──────────────────────────────────────────┘
                                               │
      /data/data/io.fold/files/usr    bionic prefix built from termux-packages
@@ -70,10 +72,10 @@ vscode.dev and Remote-SSH already use this split. FoldCode keeps both halves on 
 
 Key pieces:
 
-- **ServerService** is a foreground service with a persistent notification and a Stop action. It starts `code-server` with the right environment (`PREFIX`, `HOME`, `TMPDIR`, `PATH`, `LANG`), on a random localhost port with a random per-launch password. The app puts the auth cookie into the WebView's `CookieManager`, so no password is ever typed and other apps on the phone can't open the editor. It also health-checks the server, restarts it after a crash and keeps a log.
+- **BackendService** is a foreground service with a persistent notification and a Stop action. It starts `code-server` with the right environment (`PREFIX`, `HOME`, `TMPDIR`, `PATH`, `LANG`), on a random localhost port with a random per-launch password. The app puts the auth cookie into the WebView's `CookieManager`, so no password is ever typed and other apps on the phone can't open the editor. It also health-checks the backend, restarts it after a crash and keeps a log.
 - **Host bridge.** Kotlin exposes `window.FoldHost` to the workbench through `addJavascriptInterface`. A small browser-side workbench contribution (one of our code-server patches) receives posture changes and keyboard routing, and calls VS Code commands: toggle the sidebar, move the panel, change font size, open the preview.
 - **Key injection** (settled in phase 0, see §8). While the CodeKeyboard is active, the window sets `FLAG_ALT_FOCUSABLE_IM`, so the system keyboard can't show. The CodeKeyboard then talks to the WebView's own `InputConnection` the way an IME would: `commitText` for any text, Polish letters included, and `sendKeyEvent` for keys and shortcuts. Chromium turns these into *trusted* DOM events, so VS Code keybindings, Monaco and xterm.js behave as with a real keyboard. Switching to Gboard just clears the flag.
-- **RecoveryTerminal** is a plain native terminal (Termux's `terminal-emulator`/`terminal-view` libraries, Apache-2.0). It opens when the server can't start, so the environment can always be repaired.
+- **RecoveryTerminal** is a plain native terminal (Termux's `terminal-emulator`/`terminal-view` libraries, Apache-2.0). It opens when the backend can't start, so the environment can always be repaired.
 
 ---
 
@@ -88,7 +90,7 @@ Key pieces:
 | **Laptop mode** (half-open, hinge horizontal) | Split exactly at the hinge bounds, so nothing sits on the crease. **Top:** the workbench. **Bottom:** the CodeKeyboard with a trackpad strip for moving the cursor. One tap swaps the bottom to terminal or preview. |
 | **Book mode** (half-open, hinge vertical) | Editor on one half, preview or terminal on the other. Falls out of the split preview. |
 
-**Seamless fold/unfold.** The manifest handles `screenSize|smallestScreenSize|screenLayout|orientation|density|keyboard|keyboardHidden|uiMode` itself, so the Activity and the WebView are never recreated. Each posture has a layout preset that applies automatically and remembers manual tweaks. If Android kills the Activity anyway, the server keeps running in its service and VS Code restores open editors on reload.
+**Seamless fold/unfold.** The manifest handles `screenSize|smallestScreenSize|screenLayout|orientation|density|keyboard|keyboardHidden|uiMode` itself, so the Activity and the WebView are never recreated. Each posture has a layout preset that applies automatically and remembers manual tweaks. If Android kills the Activity anyway, the backend keeps running in its service and VS Code restores open editors on reload.
 
 **Split preview.** A second native WebView. It opens automatically when a dev server starts listening (`php -S`, Vite, Flask and so on). It has reload, a mobile/desktop viewport toggle and an optional in-page console (Eruda). Debug builds allow `chrome://inspect` from the PC.
 
@@ -203,19 +205,24 @@ scripts/serve-repo.sh           # serve out/repo to the phone over adb reverse
 - [ ] Public package hosting: a separate public GitHub repo for the apt repo (the code repo stays private)
 - [ ] Language packs: php + composer, sqlite, mariadb, postgresql, python, clang/lldb/cmake/ninja/make/gdb, rust + rust-analyzer, golang, gh, plus the `fold-*` meta packages
 
-### Phase 2 — VS Code server on bionic
-- [ ] Fork code-server at the latest release and set up our patch series
-- [ ] Build for android-arm64 against io.fold's Node, using TUR's code-server recipe as the reference. Native modules: node-pty, @vscode/spdlog, @parcel/watcher, @vscode/sqlite3, native-watchdog, argon2. Use the prefix's `rg` instead of the bundled one
-- [ ] Platform patch: treat `android` as Linux, set the extension target platform, use Open VSX by default
-- [ ] Package it as a `code-server` .deb and add it to the bootstrap
-- [ ] Smoke test on the phone: start the server from a shell and open it in Chrome
+### Phase 2 — VS Code backend on bionic
+- [x] Pick the version: code-server **4.145.2** (VS Code `c4453f8e`) needs Node **24**, the same major as our nodejs-lts 24.22.2, so no second Node is needed
+- [x] Recipe `packages/recipes/code-server/` (based on TUR's MIT recipe): VS Code built on the host, native modules (node-pty, spdlog, watcher, argon2…) cross-compiled for arm64, the prefix's `node` and `rg` instead of the bundled ones, and `bin/code-server`
+- [x] Android user-data patch, written against the real `userDataPath.ts` (TUR's version wouldn't apply: it assumed `path.join(os.homedir())` and an unsubstituted `@TERMUX_HOME@`)
+- [x] Build the `code-server` .deb in Docker (`scripts/build-packages.sh code-server`). VS Code compiled with 0 errors. The .deb is 104 MB (545 MB unpacked). Native modules (node-pty, spdlog, watcher, argon2, sqlite3, kerberos) are ARM64 and link bionic `libc.so`/`libc++_shared.so`; `lib/node` → prefix `node`, every bundled `rg` → prefix `rg`, no `com.termux` paths
+- [ ] Trim the package: ~170 MB is GitHub's bundled Copilot SDK with linux-x64/musl/Windows binaries that never load on Android
+- [x] Backend launcher `io.fold.runtime.Backend`: 127.0.0.1, random port, random per-launch password (`--auth password`), `/healthz` wait, automatic login cookie into the WebView. Cleartext HTTP is allowed only for 127.0.0.1/localhost (`res/xml/network_security_config.xml`)
+- [x] Smoke-test screen `VsCodeProbeActivity` (backend + WebView, workbench check with `--ez autotest true`)
+- [ ] Extension target platform + Open VSX defaults; check that `process.platform === "android"` doesn't break other VS Code paths
+- [ ] Add code-server to the bootstrap
+- [ ] Smoke test on the phone (after your OK): start the backend inside the app and open the UI in a WebView/browser on the phone
 
 ### Phase 3 — Android shell
 - [ ] SetupActivity: unpack the bootstrap with symlinks, progress UI, first-run checks
-- [ ] ServerService: foreground service, env, random port and password, health check, restart, log
+- [ ] BackendService: foreground service, env, random port and password, health check, restart, log
 - [ ] MainActivity: workbench WebView with the auth cookie. Enable JS, DOM storage, service workers, file chooser, downloads, clipboard and `window.open`. Handle Back; no reloads on config changes
 - [ ] RecoveryTerminal (terminal-view)
-- [ ] App settings: font size, keyboard options, keep-awake, server logs
+- [ ] App settings: font size, keyboard options, keep-awake, backend logs
 
 ### Phase 4 — Touch-first input
 - [ ] CodeKeyboard: layers, sticky modifiers, cursor swipe, long-press alternates with Polish letters, haptics

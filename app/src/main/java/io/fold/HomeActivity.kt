@@ -25,6 +25,7 @@ class HomeActivity : Activity() {
         buttons.addSpaced(Ui.button(this, "Fold probe") { startActivity(Intent(this, FoldProbeActivity::class.java)) })
         buttons.addSpaced(Ui.button(this, "Keyboard spike") { startActivity(Intent(this, KeyboardSpikeActivity::class.java)) })
         buttons.addSpaced(Ui.button(this, "Bootstrap") { startActivity(Intent(this, io.fold.probe.BootstrapProbeActivity::class.java)) })
+        buttons.addSpaced(Ui.button(this, "VS Code") { startActivity(Intent(this, io.fold.probe.VsCodeProbeActivity::class.java)) })
         col.addSpaced(buttons, 16)
 
         val report = Ui.mono(this, 11f).apply { text = "Collecting device report…" }

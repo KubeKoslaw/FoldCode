@@ -1,0 +1,14 @@
+VS Code throws "Platform not supported" for process.platform === 'android'.
+Treat Android like Linux: user data under $XDG_CONFIG_HOME or ~/.config.
+Context checked against microsoft/vscode c4453f8e (the lib/vscode of code-server v4.145.2).
+
+--- a/lib/vscode/src/vs/platform/environment/node/userDataPath.ts
++++ b/lib/vscode/src/vs/platform/environment/node/userDataPath.ts
+@@ -98,6 +98,7 @@
+ 		case 'linux':
++		case 'android':
+ 			appDataPath = process.env['XDG_CONFIG_HOME'] || join(homedir(), '.config');
+ 			break;
+ 		default:
+ 			throw new Error('Platform not supported');
+ 	}
