@@ -260,7 +260,7 @@ scripts/serve-repo.sh           # serve out/repo to the phone over adb reverse
 - [x] Preview pane (`PreviewPane`) + `DevServerWatcher`: auto-open, reload, mobile/desktop width, open in browser, close
 - [x] Book mode: code + keys on the left half, preview on the right
 - [x] Emulator test of all layouts with a real HTTP server reached through `adb reverse` (results in §13)
-- [ ] Phone test with VS Code in every posture (needs your OK)
+- [x] Phone test with VS Code in every posture (2026-11-11): "works well". Installed as an update; the user's git repo and extensions in VS Code survived it
 - [ ] Per-posture VS Code layout (sidebar, panels, font) → backlog "small vs big screen"
 
 ### Phase 6 — Extras
