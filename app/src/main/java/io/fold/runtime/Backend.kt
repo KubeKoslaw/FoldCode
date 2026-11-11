@@ -71,6 +71,9 @@ class Backend(private val rt: Runtime) {
         return c.headerFields["Set-Cookie"]?.firstOrNull { it.startsWith("code-server-session=") }
     }
 
+    /** Blocks until the backend process exits; returns its exit code (or -1 if it never started). */
+    fun waitForExit(): Int = process?.waitFor() ?: -1
+
     fun stop() {
         process?.let { p ->
             p.destroy()

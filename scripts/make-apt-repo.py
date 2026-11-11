@@ -14,6 +14,7 @@ import gzip
 import hashlib
 import io
 import os
+import re
 import shutil
 import subprocess
 import tarfile
@@ -54,6 +55,11 @@ def field(control: str, key: str) -> str:
     return ""
 
 
+def safe_name(name: str) -> str:
+    """GitHub renames release assets with characters like '+', ':' or '~'; keep names predictable."""
+    return re.sub(r"[^A-Za-z0-9._-]", "_", name)
+
+
 def version_key(v: str):
     # Good enough to pick the newest build of the same package for a dev repo.
     return [int(p) if p.isdigit() else p for p in v.replace("-", ".").replace(":", ".").replace("+", ".").replace("~", ".").split(".")]
@@ -64,15 +70,23 @@ def main():
     ap.add_argument("--debs", default=str(ROOT / "out/debs"))
     ap.add_argument("--out", default=str(ROOT / "out/repo"))
     ap.add_argument("--gnupg", default=str(ROOT / "keys/gnupg"))
+    ap.add_argument("--flat", action="store_true",
+                    help="flat repo (all files in one directory, safe file names) for GitHub Releases: deb <url> ./")
     args = ap.parse_args()
 
     out = Path(args.out)
-    pool = out / "pool"
-    binary = out / "dists/stable/main" / f"binary-{ARCH}"
     if out.exists():
         shutil.rmtree(out)
-    pool.mkdir(parents=True)
-    binary.mkdir(parents=True)
+    if args.flat:
+        pool = binary = dist = out
+        rel = "./"
+    else:
+        pool = out / "pool"
+        binary = out / "dists/stable/main" / f"binary-{ARCH}"
+        dist = out / "dists/stable"
+        rel = "pool/"
+    pool.mkdir(parents=True, exist_ok=True)
+    binary.mkdir(parents=True, exist_ok=True)
 
     newest = {}
     for deb in sorted(Path(args.debs).glob("*.deb")):
@@ -81,18 +95,21 @@ def main():
         if arch not in (ARCH, "all"):
             continue
         name, ver = field(control, "Package"), field(control, "Version")
+        if args.flat and name.endswith("-static"):
+            continue  # static libraries are only for building on the device; keep the public repo lean
         if name not in newest or version_key(ver) > version_key(newest[name][1]):
             newest[name] = (deb, ver, control)
 
     stanzas = []
     for name in sorted(newest):
         deb, ver, control = newest[name]
-        target = pool / deb.name
+        fname = safe_name(deb.name) if args.flat else deb.name
+        target = pool / fname
         shutil.copy2(deb, target)
         blob = target.read_bytes()
         stanzas.append(
             control
-            + f"\nFilename: pool/{deb.name}"
+            + f"\nFilename: {rel}{fname}"
             + f"\nSize: {len(blob)}"
             + f"\nMD5sum: {hashlib.md5(blob).hexdigest()}"
             + f"\nSHA256: {hashlib.sha256(blob).hexdigest()}"
@@ -102,18 +119,17 @@ def main():
     with gzip.GzipFile(binary / "Packages.gz", "wb", mtime=0) as gz:
         gz.write(packages)
 
-    dist = out / "dists/stable"
-    lines = [
-        "Origin: FoldCode",
-        "Label: FoldCode",
-        "Suite: stable",
-        "Codename: stable",
-        f"Date: {email.utils.formatdate(usegmt=True)}",
-        f"Architectures: {ARCH}",
-        "Components: main",
-        "Description: FoldCode packages for the io.fold prefix",
-    ]
-    files = [p for p in sorted(dist.rglob("*")) if p.is_file()]
+    lines = ["Origin: FoldCode", "Label: FoldCode"]
+    if not args.flat:
+        lines += ["Suite: stable", "Codename: stable"]
+    lines += [f"Date: {email.utils.formatdate(usegmt=True)}", f"Architectures: {ARCH}"]
+    if not args.flat:
+        lines += ["Components: main"]
+    lines += ["Description: FoldCode packages for the io.fold prefix"]
+    if args.flat:
+        files = [binary / "Packages", binary / "Packages.gz"]
+    else:
+        files = [p for p in sorted(dist.rglob("*")) if p.is_file()]
     for algo, fn in (("MD5Sum", hashlib.md5), ("SHA256", hashlib.sha256)):
         lines.append(f"{algo}:")
         for p in files:

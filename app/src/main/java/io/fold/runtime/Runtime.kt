@@ -24,7 +24,7 @@ class Runtime(private val ctx: Context) {
      * the prefix and run the second stage. (The Termux app only marks bin/, libexec and the apt
      * helpers executable; that breaks e.g. npm, whose entry point lives in lib/node_modules.)
      */
-    fun installBootstrap(zip: File, log: (String) -> Unit) {
+    fun installBootstrap(zip: File, aptSource: String, log: (String) -> Unit) {
         staging.deleteRecursively()
         staging.mkdirs()
         val modes = ZipModes.read(zip)
@@ -71,8 +71,8 @@ class Runtime(private val ctx: Context) {
         require(staging.renameTo(prefix)) { "could not move staging into $prefix" }
         home.mkdirs()
 
-        configureApt(DEV_REPO_URL)
-        log("apt → $DEV_REPO_URL")
+        configureApt(aptSource)
+        log("apt → $aptSource")
 
         val second = File(prefix, "etc/termux/termux-bootstrap/second-stage/termux-bootstrap-second-stage.sh")
         if (second.exists()) {
@@ -89,10 +89,8 @@ class Runtime(private val ctx: Context) {
      * Points apt at the FoldCode repo (never Termux's: those packages are built for com.termux),
      * trusts our repo key (shipped in the APK assets), and stops `pkg` from picking Termux mirrors.
      */
-    fun configureApt(repoUrl: String) {
-        File(prefix, "etc/apt/sources.list").writeText(
-            "# Managed by the FoldCode app.\ndeb ${repoUrl.trimEnd('/')}/ stable main\n",
-        )
+    fun configureApt(sourceLine: String) {
+        File(prefix, "etc/apt/sources.list").writeText("# Managed by the FoldCode app.\n$sourceLine\n")
         File(prefix, "etc/apt/sources.list.d").listFiles()?.forEach { it.delete() }
         val keyring = File(prefix, "etc/apt/trusted.gpg.d/foldcode.gpg")
         keyring.parentFile?.mkdirs()
@@ -163,5 +161,11 @@ class Runtime(private val ctx: Context) {
          * `adb reverse tcp:8686 tcp:8686`. The public repo URL replaces this once hosting is decided.
          */
         const val DEV_REPO_URL = "http://127.0.0.1:8686"
+
+        /** apt source for the development repo (pool layout). */
+        const val DEV_APT_SOURCE = "deb $DEV_REPO_URL/ stable main"
+
+        /** apt source for the public repo: a flat repository in GitHub release assets. */
+        fun releaseAptSource(repoUrl: String) = "deb ${repoUrl.trimEnd('/')}/ ./"
     }
 }

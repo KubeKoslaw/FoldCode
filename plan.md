@@ -31,6 +31,11 @@ Desktop VS Code works the same way (Electron = a Chromium window + Node.js proce
 | Host safety (phase 1) | **Patch out `run-docker.sh`'s `pid_max` change** | Upstream may lower `/proc/sys/kernel/pid_max` on the *host* through sudo. We build only aarch64, which doesn't need it, so the patch skips it. |
 | apt repo (phase 1) | **Own signed repo; the app writes `sources.list`, the key and `TERMUX_PKG_NO_MIRROR_SELECT=1`** | The repo URL isn't baked into any package, so moving the repo needs no rebuild. The signing key lives in its own keyring in `keys/` (git-ignored), never in a personal `~/.gnupg`. Its public half ships in the APK (`assets/foldcode-repo.gpg`). `pkg` would otherwise switch to Termux mirrors, whose packages are built for com.termux. |
 | Dev repo (phase 1) | **Served from the PC on localhost and reached by the phone through `adb reverse tcp:8686`** | Nothing is opened on the LAN, and it works over the wireless adb link. The code repo is private, so public package hosting will be a separate public repo (GitHub Releases/Pages). |
+| AI chat panel (phase 3) | **Hidden by default, one tap to open** | Chosen. `workbench.secondarySideBar.defaultVisibility: hidden`; AI features stay available, and CLI agents in the terminal are unaffected. |
+| Theme (phase 3) | **Follows Android's dark mode** | Chosen. `window.autoDetectColorScheme` plus the WebView's force-dark setting in web-theme-only mode, so VS Code's `prefers-color-scheme` matches the system. |
+| First start (phase 3) | **Download the environment from GitHub at first start** | Chosen. A small APK, but first start needs internet. The bootstrap URL and SHA-256 are pinned in the APK (`app/bootstrap.properties` → BuildConfig); the download resumes and is verified before installing. |
+| Background (phase 3) | **Backend keeps running in a foreground service with a Stop action** | Chosen. Terminals, dev servers and tasks survive app switches; the service restarts a crashed backend (3× in 2 min max). |
+| Public packages (phase 3) | **github.com/KubeKoslaw/foldcode-packages (public)** | Confirmed. It holds only README, the public repo key and the build sources (termux-packages commit, patches, recipes, as GPL requires). Packages are the assets of release `stable` (flat repo `deb …/releases/download/stable/ ./`, safe file names, no `-static`); the bootstrap is in release `bootstrap-<sha prefix>`. Single author (noreply), same privacy hooks. The app code repo stays private. |
 | App id / name | **`io.fold`**, display name **FoldCode** | The termux-packages wiki advises ≤ 10 characters because of Unix socket path limits under `/data/data/<id>`. **Permanent**: packages built for one id can't be moved to another. |
 | Paths on the phone | prefix `/data/data/io.fold/files/usr`, home `/data/data/io.fold/files/home` | Same layout as Termux, so its build recipes work unchanged. |
 | Extras | **Git + GitHub sign-in, access to phone files, AI CLI agents in the terminal** | Remote mode to the PC wasn't picked. |
@@ -218,9 +223,14 @@ scripts/serve-repo.sh           # serve out/repo to the phone over adb reverse
 - [x] Smoke test on the phone: backend inside the app, workbench in a WebView (results in §10)
 
 ### Phase 3 — Android shell
-- [ ] SetupActivity: unpack the bootstrap with symlinks, progress UI, first-run checks
-- [ ] BackendService: foreground service, env, random port and password, health check, restart, log
-- [ ] MainActivity: workbench WebView with the auth cookie. Enable JS, DOM storage, service workers, file chooser, downloads, clipboard and `window.open`. Handle Back; no reloads on config changes
+- [x] First start in `MainActivity`: download (`BootstrapDownloader`: https only, resumable, size + SHA-256 check), install, write the VS Code defaults (`VsCodeDefaults`)
+- [x] `BackendService` + `BackendHolder`: foreground service with a Stop action, random port + password, health check, login cookie, restart on crash, log in `files/logs/code-server.log`
+- [x] `MainActivity`: full-screen workbench WebView. Outside links open in the browser, file chooser for uploads, Back leaves the app without stopping VS Code, no reload on fold/unfold. Probes moved to the launcher long-press "Diagnostics"
+- [x] Clipboard bridge (`HostBridge`): `navigator.clipboard` goes to Android's ClipboardManager over a WebMessageListener limited to the backend's origin
+- [x] Publish: bootstrap now includes code-server (260 MB, 107 packages); `scripts/publish-packages.sh` uploads the repo and bootstrap and writes `app/bootstrap.properties`
+- [ ] Fresh-install test on the phone (needs your OK)
+- [ ] Downloads from VS Code (blob URLs) and `window.open`
+- [ ] Trim the bootstrap: the Copilot SDK binaries for other platforms (~170 MB unpacked)
 - [ ] RecoveryTerminal (terminal-view)
 - [ ] App settings: font size, keyboard options, keep-awake, backend logs
 

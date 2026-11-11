@@ -11,6 +11,11 @@
     <color name="hinge">#80F14C4C</color>
 
     <string name="app_name">FoldCode</string>
+    <string name="backend_channel">VS Code backend</string>
+    <string name="backend_running">VS Code is running</string>
+    <string name="backend_running_text">Terminals and dev servers keep running in the background</string>
+    <string name="stop">Stop</string>
+    <string name="diagnostics">Diagnostics</string>
 
     <style name="Theme.Fold" parent="android:Theme.Material.NoActionBar">
         <item name="android:colorPrimary">@color/surface</item>

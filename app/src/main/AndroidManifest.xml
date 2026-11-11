@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="false"
@@ -12,17 +14,32 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Fold">
 
-        <!-- Every fold/unfold/rotate change is handled in-process: the Activity (and later the
-             VS Code WebView) must never be recreated when the phone is folded or unfolded. -->
+        <!-- Every fold/unfold/rotate change is handled in-process: the Activity and the
+             VS Code WebView must never be recreated when the phone is folded or unfolded. -->
         <activity
-            android:name=".HomeActivity"
+            android:name=".MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|uiMode|density"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
+
+        <service
+            android:name=".backend.BackendService"
+            android:exported="false" />
+
+        <!-- Development probes; reachable from the launcher icon's long-press "Diagnostics". -->
+        <activity
+            android:name=".HomeActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|uiMode|density"
+            android:exported="true" />
 
         <activity
             android:name=".probe.FoldProbeActivity"
