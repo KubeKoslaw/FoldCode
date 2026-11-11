@@ -215,7 +215,7 @@ scripts/serve-repo.sh           # serve out/repo to the phone over adb reverse
 - [x] Smoke-test screen `VsCodeProbeActivity` (backend + WebView, workbench check with `--ez autotest true`)
 - [ ] Extension target platform + Open VSX defaults; check that `process.platform === "android"` doesn't break other VS Code paths
 - [ ] Add code-server to the bootstrap
-- [ ] Smoke test on the phone (after your OK): start the backend inside the app and open the UI in a WebView/browser on the phone
+- [x] Smoke test on the phone: backend inside the app, workbench in a WebView (results in §10)
 
 ### Phase 3 — Android shell
 - [ ] SetupActivity: unpack the bootstrap with symlinks, progress UI, first-run checks
@@ -380,3 +380,37 @@ Bootstrap with `nodejs-lts`: 85 MB, installs in 4.9 s (5,139 files). Node.js **2
 | Earlier checks | bash, git, OpenSSH, ripgrep, shebangs and `apt update` from the dev repo all still pass |
 
 The core toolchain for phase 2 (Node + npm on bionic) is in place.
+
+---
+
+## 10. Phase 2 findings
+
+### First VS Code run on the Magic V3 (2026-11-11)
+
+- `apt install code-server` from the dev repo pulled in libandroid-spawn, glib, libsecret and python (a glib dependency) as well.
+- `VsCodeProbeActivity` timings and checks:
+
+| Step | Result |
+|---|---|
+| Backend `/healthz` | **1.1 s** after start |
+| Automatic login (cookie) | OK |
+| Workbench page loaded | **3.9 s** |
+| Workbench check | `.monaco-workbench` and editor present, explorer shows `hello.js`, 7 status bar items, no error notifications |
+| Extension host | launched (`Extension host agent started`, `Launched Extension Host Process`) |
+
+- **Harmless log errors:**
+  - "Unable to retrieve mac address" and `@vscode/deviceid` "Unsupported platform": Android hides both, VS Code falls back, and telemetry is off anyway.
+  - `vsda` not found: normal for non-Microsoft builds.
+  - All three can be silenced later.
+- **Seen on the outer screen (screenshot in `out/phase2/`, git-ignored):**
+  - It works, but the layout is cramped.
+  - It starts in **Restricted Mode** (workspace trust).
+  - The **Chat/agent panel** is open by default and takes half the width.
+  - The light theme is on.
+  - The Welcome page opens instead of the file.
+
+### Next: default settings profile (phase 3/4)
+- Turn off workspace trust for local projects (or pass `--disable-workspace-trust`).
+- Hide the AI chat panel by default (`chat.disableAIFeatures` / secondary sidebar hidden); terminal CLI agents are unaffected.
+- Default to a dark theme and skip the Welcome page.
+- Touch-friendly sizes (§3).
