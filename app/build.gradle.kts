@@ -43,4 +43,5 @@ dependencies {
     implementation("androidx.window:window:1.5.1")
     implementation("androidx.window:window-java:1.5.1")
     implementation("androidx.webkit:webkit:1.18.0")
+    testImplementation("junit:junit:4.13.2")
 }

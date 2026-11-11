@@ -79,7 +79,7 @@ class BootstrapProbeActivity : Activity() {
         }
         log("installing ${zip.name} (${zip.length() / 1024 / 1024} MB)…")
         val t0 = System.currentTimeMillis()
-        rt.installBootstrap(zip.inputStream()) { log(it) }
+        rt.installBootstrap(zip) { log(it) }
         log("installed in ${(System.currentTimeMillis() - t0) / 1000.0}s")
     }
 

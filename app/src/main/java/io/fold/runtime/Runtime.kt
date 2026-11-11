@@ -3,7 +3,6 @@ package io.fold.runtime
 import android.content.Context
 import android.system.Os
 import java.io.File
-import java.io.InputStream
 import java.util.concurrent.TimeUnit
 import java.util.zip.ZipInputStream
 
@@ -20,16 +19,20 @@ class Runtime(private val ctx: Context) {
     val isInstalled: Boolean get() = File(prefix, "bin/bash").exists()
 
     /**
-     * Installs a Termux-format bootstrap zip, the way the Termux app does it:
-     * extract into a staging dir, make bin/libexec/apt helpers executable, create the symlinks
-     * listed in SYMLINKS.txt, then swap staging in as the prefix and run the second stage.
+     * Installs a Termux-format bootstrap zip: extract into a staging dir keeping the executable
+     * bits stored in the zip, create the symlinks listed in SYMLINKS.txt, then swap staging in as
+     * the prefix and run the second stage. (The Termux app only marks bin/, libexec and the apt
+     * helpers executable; that breaks e.g. npm, whose entry point lives in lib/node_modules.)
      */
-    fun installBootstrap(zip: InputStream, log: (String) -> Unit) {
+    fun installBootstrap(zip: File, log: (String) -> Unit) {
         staging.deleteRecursively()
         staging.mkdirs()
+        val modes = ZipModes.read(zip)
+        log("zip modes for ${modes.size} entries")
         val symlinks = mutableListOf<Pair<String, String>>()
         var files = 0
-        ZipInputStream(zip.buffered()).use { zin ->
+        var executables = 0
+        ZipInputStream(zip.inputStream().buffered()).use { zin ->
             while (true) {
                 val e = zin.nextEntry ?: break
                 if (e.name == "SYMLINKS.txt") {
@@ -48,8 +51,10 @@ class Runtime(private val ctx: Context) {
                     out.parentFile?.mkdirs()
                     out.outputStream().use { zin.copyTo(it) }
                     val n = e.name
-                    if (n.startsWith("bin/") || n.startsWith("libexec") || n.startsWith("lib/apt/apt-helper") || n.startsWith("lib/apt/methods")) {
+                    val execInZip = ((modes[n] ?: 0) and ZipModes.ANY_EXEC) != 0
+                    if (execInZip || n.startsWith("bin/") || n.startsWith("libexec") || n.startsWith("lib/apt/apt-helper") || n.startsWith("lib/apt/methods")) {
                         Os.chmod(out.path, "700".toInt(8))
+                        executables++
                     }
                     files++
                 }
@@ -60,7 +65,7 @@ class Runtime(private val ctx: Context) {
             Os.symlink(target, link)
         }
         File(staging, "tmp").mkdirs()
-        log("extracted $files files, ${symlinks.size} symlinks")
+        log("extracted $files files ($executables executable), ${symlinks.size} symlinks")
 
         prefix.deleteRecursively()
         require(staging.renameTo(prefix)) { "could not move staging into $prefix" }
