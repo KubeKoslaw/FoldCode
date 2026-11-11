@@ -36,6 +36,11 @@ Desktop VS Code works the same way (Electron = a Chromium window + Node.js proce
 | First start (phase 3) | **Download the environment from GitHub at first start** | Chosen. A small APK, but first start needs internet. The bootstrap URL and SHA-256 are pinned in the APK (`app/bootstrap.properties` → BuildConfig); the download resumes and is verified before installing. |
 | Background (phase 3) | **Backend keeps running in a foreground service with a Stop action** | Chosen. Terminals, dev servers and tasks survive app switches; the service restarts a crashed backend (3× in 2 min max). |
 | Public packages (phase 3) | **github.com/KubeKoslaw/foldcode-packages (public)** | Confirmed. It holds only README, the public repo key and the build sources (termux-packages commit, patches, recipes, as GPL requires). Packages are the assets of release `stable` (flat repo `deb …/releases/download/stable/ ./`, safe file names, no `-static`); the bootstrap is in release `bootstrap-<sha prefix>`. Single author (noreply), same privacy hooks. The app code repo stays private. |
+| Default keyboard (phase 4) | **System keyboard + FoldCode's 2-row key bar above it**; the full code keyboard sits behind ⌨ | Chosen. Bar row 1: Esc, Tab, Ctrl, Alt, ⇧, arrows, ⌨. Row 2: `{ } [ ] ( ) < > ; = \| /`. While Ctrl is held, row 2 becomes ^C ^V ^X ^Z ^Y ^S ^F ^A ^/ ⇧^P plus "abc" (the full keyboard with Ctrl kept). Gboard delivers letters as text, so generic Ctrl+letter only works on our keyboard. |
+| Code keyboard layout (phase 4) | **QWERTY + fixed number row** (5 rows + function row), symbols layer behind `?#{` | Chosen. Long press gives Polish letters (ą ć ę ł ń ó ś ź ż) and the symbol over each digit. Swiping on space moves the cursor; ⌫ and arrows repeat; ▾ folds it to the function row. |
+| Showing the keys (phase 4) | **Automatically while a text field is focused** | Chosen. The page reports focus and taps into text fields over the bridge, so a tap brings folded keys back and scrolling doesn't. |
+| Key feedback (phase 4) | **Vibration** (no sound) | Chosen. |
+| Hiding the system keyboard (phase 4) | **`FLAG_ALT_FOCUSABLE_IM` + `inputmode="none"` on focused fields + a one-frame window refocus** | Measured on the emulator. The window flag alone works only if set before the window has focus; switching at runtime let Chromium bring Gboard back. `inputmode="none"` (set by the page in code-keyboard mode) stops Chromium asking for the system keyboard while text input keeps working. |
 | App id / name | **`io.fold`**, display name **FoldCode** | The termux-packages wiki advises ≤ 10 characters because of Unix socket path limits under `/data/data/<id>`. **Permanent**: packages built for one id can't be moved to another. |
 | Paths on the phone | prefix `/data/data/io.fold/files/usr`, home `/data/data/io.fold/files/home` | Same layout as Termux, so its build recipes work unchanged. |
 | Extras | **Git + GitHub sign-in, access to phone files, AI CLI agents in the terminal** | Remote mode to the PC wasn't picked. |
@@ -236,8 +241,11 @@ scripts/serve-repo.sh           # serve out/repo to the phone over adb reverse
 - [ ] App settings: font size, keyboard options, keep-awake, backend logs
 
 ### Phase 4 — Touch-first input
-- [ ] CodeKeyboard: layers, sticky modifiers, cursor swipe, long-press alternates with Polish letters, haptics
-- [ ] Extra-keys bar above the system keyboard
+- [x] Code keyboard (`io.fold.keys`: `Keys`, `KeyboardView`, `KeyInjector`, `InputController`): layers, sticky/locked modifiers, cursor swipe on space, long-press alternatives incl. Polish letters, key repeat, multitouch, haptics, light/dark palette
+- [x] Key bar above the system keyboard, with the Ctrl shortcut row
+- [x] Show/hide from page focus (`HostBridge`), and switching between the system keyboard and ours at runtime
+- [x] `KeyboardDemoActivity`: the real keyboard over the phase 0 Monaco/xterm page, no backend needed, runs on the emulator (results in §12)
+- [ ] Test the keyboard in the real app on the phone (needs your OK)
 - [ ] Workbench touch patches: hit targets, long-press menu, double-tap select, **Monaco selection handles**, pinch font size, terminal selection, command-palette button
 - [ ] Default touch settings profile
 
@@ -448,3 +456,25 @@ Notes:
 - VS Code rewrote the theme names in `settings.json` (`Default Dark Modern` → `Dark Modern`), which confirms it read our defaults.
 - On MagicOS, `Log.i` lines from the app don't show up in `adb logcat`. Diagnose from files (`files/logs/code-server.log`, the probes' logs) instead.
 - Before publishing, the bootstrap on GitHub was checked from the PC: Range/206 resume, `InRelease` signature, `Packages` hash, and a byte-identical bootstrap (SHA-256 `1daa5a20…`).
+
+---
+
+## 12. Phase 4 findings (emulator, 2026-11-11)
+
+All checks ran on the Pixel 9 Pro Fold emulator with `KeyboardDemoActivity`, driven by adb taps and read back from the page:
+
+| Check | Result |
+|---|---|
+| Bar `{` `}` `←` above Gboard | Editor got `{}` with the cursor inside |
+| Ctrl → `^Z` | Undo worked |
+| Our keyboard: `h` `i`, long press `a`, ⇧ `a` | `hiąA` (ą through the InputConnection) |
+| Our keyboard: Ctrl + `s` | The editor's Ctrl+S command ran (`save=1`), no letter inserted |
+| Swipe on space | Cursor moved 4 positions |
+| ▾, then tap the focused editor | Folds to the function row; the tap brings the keys back |
+| Runtime switches system ⇄ code, taps in editor/terminal | Gboard only in system mode; never in code mode (after the `inputmode="none"` fix) |
+
+Bugs found and fixed on the way:
+- **The WebView had no view focus, so the page got no `focus`/`focusin` events at all** (`document.hasFocus()` was false). Fixed with `isFocusableInTouchMode` + `requestFocus()` after load and on resume.
+- **A tap into an already focused editor fires no `focusin`, and Monaco swallows `click`.** Taps are now detected from short pointerdown/pointerup pairs (<10 px, <500 ms).
+- **Runtime mode switches:** `FLAG_ALT_FOCUSABLE_IM` alone didn't stop Gboard after a switch → added `inputmode="none"` and a one-frame `FLAG_NOT_FOCUSABLE` toggle. The toggle also makes Gboard appear right after switching to it.
+- Monaco 0.57 uses an **EditContext** element (`div.native-edit-context`), which the focus check treats as a text field.

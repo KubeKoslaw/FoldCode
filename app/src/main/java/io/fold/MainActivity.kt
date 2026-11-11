@@ -44,6 +44,8 @@ class MainActivity : Activity() {
     private lateinit var rt: Runtime
     private lateinit var web: WebView
     private lateinit var bridge: HostBridge
+    private lateinit var keyboard: io.fold.keys.KeyboardView
+    private lateinit var input: io.fold.keys.InputController
     private lateinit var statusPanel: LinearLayout
     private lateinit var title: TextView
     private lateinit var message: TextView
@@ -65,6 +67,8 @@ class MainActivity : Activity() {
             settings.databaseEnabled = true
             settings.setSupportMultipleWindows(false)
             settings.mediaPlaybackRequiresUserGesture = true
+            // Without view focus Chromium never fires focus events in the page, so the keys wouldn't show.
+            isFocusableInTouchMode = true
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                     val u = request.url
@@ -88,7 +92,9 @@ class MainActivity : Activity() {
             }
             visibility = View.INVISIBLE
         }
-        bridge = HostBridge(this, web)
+        keyboard = io.fold.keys.KeyboardView(this).apply { visibility = View.GONE }
+        input = io.fold.keys.InputController(this, web, keyboard)
+        bridge = HostBridge(this, web) { focused -> input.onEditableFocus(focused) }
 
         title = Ui.title(this, "FoldCode")
         message = Ui.mono(this, 12f, Ui.TEXT2)
@@ -103,11 +109,19 @@ class MainActivity : Activity() {
             addView(progress, LinearLayout.LayoutParams(-1, -2))
             addSpaced(actions, 0)
         }
-        setContentView(FrameLayout(this).apply {
+        val content = FrameLayout(this).apply {
             setBackgroundColor(Ui.BG)
             addView(web, FrameLayout.LayoutParams(-1, -1))
             addView(ScrollView(context).apply { isFillViewport = true; addView(statusPanel) }, FrameLayout.LayoutParams(-1, -1))
+        }
+        // VS Code above, FoldCode's keys below (and above the system keyboard, thanks to adjustResize).
+        setContentView(LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Ui.BG)
+            addView(content, LinearLayout.LayoutParams(-1, 0, 1f))
+            addView(keyboard, LinearLayout.LayoutParams(-1, -2))
         })
+        input.attach()
         applyTheme()
 
         if (needsSetup()) runSetup() else startBackend()
@@ -165,6 +179,7 @@ class MainActivity : Activity() {
                 }
                 web.loadUrl("${s.url}/?folder=${File(rt.home, "projects").path}")
                 web.visibility = View.VISIBLE
+                web.requestFocus()
                 (statusPanel.parent as View).visibility = View.GONE
             }
         }
@@ -206,6 +221,12 @@ class MainActivity : Activity() {
         if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
             WebSettingsCompat.setForceDark(web.settings, if (night) WebSettingsCompat.FORCE_DARK_ON else WebSettingsCompat.FORCE_DARK_OFF)
         }
+        input.setNight(night)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (web.visibility == View.VISIBLE) web.requestFocus()
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -232,6 +253,7 @@ class MainActivity : Activity() {
 
     @Deprecated("Back keeps VS Code running and just leaves the app")
     override fun onBackPressed() {
+        if (input.handleBack()) return
         moveTaskToBack(true)
     }
 
