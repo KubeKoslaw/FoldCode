@@ -199,7 +199,7 @@ scripts/serve-repo.sh           # serve out/repo to the phone over adb reverse
 - [x] Bootstrap installer in the app (`io.fold.runtime.Runtime`): extract, permissions, symlinks, second stage, apt config. Test it on the phone with `BootstrapProbeActivity`
 - [x] Repo signing key (`scripts/repo-key.sh`) and repo generator (`scripts/make-apt-repo.py`: flat pool, Packages, signed InRelease, no dpkg needed on the host)
 - [x] Dev repo on the phone: `scripts/serve-repo.sh` (localhost + `adb reverse`), then `apt update` / `apt install` from it
-- [ ] nodejs-lts + npm into the repo and the bootstrap (node verified on the phone; npm added, phone test pending)
+- [x] nodejs-lts + npm into the repo and the bootstrap (verified on the phone)
 - [ ] Public package hosting: a separate public GitHub repo for the apt repo (the code repo stays private)
 - [ ] Language packs: php + composer, sqlite, mariadb, postgresql, python, clang/lldb/cmake/ninja/make/gdb, rust + rust-analyzer, golang, gh, plus the `fold-*` meta packages
 
@@ -361,4 +361,15 @@ Bootstrap with `nodejs-lts`: 85 MB, installs in 4.9 s (5,139 files). Node.js **2
 - **npm was missing.** In this termux-packages version npm is a separate `npm` package (12.2.2) that nodejs-lts only *recommends*, so the bootstrap left it out. It's now added to the bootstrap list. `corepack` (for pnpm/yarn) is part of nodejs-lts.
 - **Patch `0006`:** `generate-bootstraps.sh` always took the first alternative of `a | b` dependencies. For npm (`nodejs | nodejs-lts`) that's `nodejs`, which isn't built. It now picks the first alternative that exists in the repo.
 - **Open for phase 2:** check which Node major version code-server needs (22 or 24) before building it.
-- **Second phone run (npm in the bootstrap):** npm was there, but running it gave "Permission denied". Its entry point `lib/node_modules/npm/bin/npm-cli.js` wasn't executable, because the installer, following the Termux app, only marked `bin/`, `libexec` and the apt helpers executable. The zip stores real Unix modes (Info-ZIP, "made by Unix"), so `ZipModes` now reads them from the central directory. About 200 executables live outside `bin/`: npm, corepack, git hook templates, the sshd service and more. A unit test (`ZipModesTest`) checks the parser against the real bootstrap. The phone retest is pending.
+- **Second phone run (npm in the bootstrap):** npm was there, but running it gave "Permission denied". Its entry point `lib/node_modules/npm/bin/npm-cli.js` wasn't executable, because the installer, following the Termux app, only marked `bin/`, `libexec` and the apt helpers executable. The zip stores real Unix modes (Info-ZIP, "made by Unix"), so `ZipModes` now reads them from the central directory. About 200 executables live outside `bin/`: npm, corepack, git hook templates, the sshd service and more. A unit test (`ZipModesTest`) checks the parser against the real bootstrap.
+
+### Node.js + npm on the Magic V3, final run (2026-11-11)
+
+| Check | Result |
+|---|---|
+| Install | 89 MB zip, **5.4 s**; 7,080 files, of which **640 executable** (modes taken from the zip), 1,557 symlinks; second stage exit 0 |
+| node | `v24.22.2 android arm64`; local HTTP server OK |
+| npm | **12.2.2**; `npm install is-number@7` from registry.npmjs.org works and the module loads |
+| Earlier checks | bash, git, OpenSSH, ripgrep, shebangs and `apt update` from the dev repo all still pass |
+
+The core toolchain for phase 2 (Node + npm on bionic) is in place.
