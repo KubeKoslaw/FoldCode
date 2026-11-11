@@ -37,6 +37,7 @@ Desktop VS Code works the same way (Electron = a Chromium window + Node.js proce
 | Background (phase 3) | **Backend keeps running in a foreground service with a Stop action** | Chosen. Terminals, dev servers and tasks survive app switches; the service restarts a crashed backend (3× in 2 min max). |
 | Public packages (phase 3) | **github.com/KubeKoslaw/foldcode-packages (public)** | Confirmed. It holds only README, the public repo key and the build sources (termux-packages commit, patches, recipes, as GPL requires). Packages are the assets of release `stable` (flat repo `deb …/releases/download/stable/ ./`, safe file names, no `-static`); the bootstrap is in release `bootstrap-<sha prefix>`. Single author (noreply), same privacy hooks. The app code repo stays private. |
 | Default keyboard (phase 4) | **System keyboard + FoldCode's 2-row key bar above it**; the full code keyboard sits behind ⌨ | Chosen. Bar row 1: Esc, Tab, Ctrl, Alt, ⇧, arrows, ⌨. Row 2: `{ } [ ] ( ) < > ; = \| /`. While Ctrl is held, row 2 becomes ^C ^V ^X ^Z ^Y ^S ^F ^A ^/ ⇧^P plus "abc" (the full keyboard with Ctrl kept). Gboard delivers letters as text, so generic Ctrl+letter only works on our keyboard. |
+| Default keyboard, revised (2026-11-11) | **FoldCode's code keyboard is now the default**; Gboard + bar only via 🌐 | Changed after trying it on the phone: "works well", but Gboard takes too much space. The code keyboard replaces both. Rows are lower on screens under 800 dp tall (both Magic V3 screens): function row 36 dp, keys 40 dp, instead of 40/46. The preference key was renamed (`keyboard_mode`), so the old stored default doesn't stick. |
 | Code keyboard layout (phase 4) | **QWERTY + fixed number row** (5 rows + function row), symbols layer behind `?#{` | Chosen. Long press gives Polish letters (ą ć ę ł ń ó ś ź ż) and the symbol over each digit. Swiping on space moves the cursor; ⌫ and arrows repeat; ▾ folds it to the function row. |
 | Showing the keys (phase 4) | **Automatically while a text field is focused** | Chosen. The page reports focus and taps into text fields over the bridge, so a tap brings folded keys back and scrolling doesn't. |
 | Key feedback (phase 4) | **Vibration** (no sound) | Chosen. |
@@ -245,7 +246,7 @@ scripts/serve-repo.sh           # serve out/repo to the phone over adb reverse
 - [x] Key bar above the system keyboard, with the Ctrl shortcut row
 - [x] Show/hide from page focus (`HostBridge`), and switching between the system keyboard and ours at runtime
 - [x] `KeyboardDemoActivity`: the real keyboard over the phase 0 Monaco/xterm page, no backend needed, runs on the emulator (results in §12)
-- [ ] Test the keyboard in the real app on the phone (needs your OK)
+- [x] Tried in the real app on the phone: works well. Feedback: prefer FoldCode's keyboard over Gboard (space) → now the default, with compact rows on short screens
 - [ ] Workbench touch patches: hit targets, long-press menu, double-tap select, **Monaco selection handles**, pinch font size, terminal selection, command-palette button
 - [ ] Default touch settings profile
 

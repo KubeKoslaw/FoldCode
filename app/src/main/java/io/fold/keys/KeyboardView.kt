@@ -43,8 +43,10 @@ class KeyboardView(ctx: Context) : View(ctx) {
 
     private val density = resources.displayMetrics.density
     private fun dp(v: Float) = v * density
-    private val functionRowHeight = dp(40f)
-    private val rowHeight = dp(46f)
+    /** Lower keys on short screens (the folded phone's outer display) so more code stays visible. */
+    private val compact get() = resources.configuration.screenHeightDp < 800
+    private val functionRowHeight get() = dp(if (compact) 36f else 40f)
+    private val rowHeight get() = dp(if (compact) 40f else 46f)
     private val gap = dp(4f)
 
     private val keyRects = mutableListOf<Pair<Key, RectF>>()

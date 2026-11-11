@@ -23,7 +23,9 @@ class InputController(
     enum class Mode { SYSTEM, CODE }
 
     private val prefs = activity.getSharedPreferences("input", Context.MODE_PRIVATE)
-    var mode = runCatching { Mode.valueOf(prefs.getString("mode", Mode.SYSTEM.name)!!) }.getOrDefault(Mode.SYSTEM)
+    // FoldCode's own keyboard by default: it replaces Gboard + the bar, so more code stays visible.
+    // (New key name, so the earlier default stored as "mode" doesn't stick around.)
+    var mode = runCatching { Mode.valueOf(prefs.getString(PREF_MODE, Mode.CODE.name)!!) }.getOrDefault(Mode.CODE)
         private set
     private var editable = false
     private var collapsed = false
@@ -88,7 +90,7 @@ class InputController(
 
     private fun setMode(m: Mode) {
         mode = m
-        prefs.edit().putString("mode", m.name).apply()
+        prefs.edit().putString(PREF_MODE, m.name).apply()
         collapsed = false
         layer = Layouts.LETTERS
         applyWindowMode()
@@ -190,6 +192,7 @@ class InputController(
     }
 
     companion object {
+        private const val PREF_MODE = "keyboard_mode"
         private const val LEFT = android.view.KeyEvent.KEYCODE_DPAD_LEFT
         private const val RIGHT = android.view.KeyEvent.KEYCODE_DPAD_RIGHT
     }
