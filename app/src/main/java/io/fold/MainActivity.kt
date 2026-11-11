@@ -47,6 +47,7 @@ class MainActivity : Activity() {
     private lateinit var keyboard: io.fold.keys.KeyboardView
     private lateinit var input: io.fold.keys.InputController
     private lateinit var fold: io.fold.fold.FoldScreen
+    private lateinit var link: io.fold.vscode.VsCodeLink
     private lateinit var statusPanel: LinearLayout
     private lateinit var title: TextView
     private lateinit var message: TextView
@@ -113,6 +114,12 @@ class MainActivity : Activity() {
         // VS Code, the preview, the keys and (in laptop mode) the trackpad, arranged by fold posture.
         fold = io.fold.fold.FoldScreen(this, web, keyboard, input) {
             setOfNotNull((BackendHolder.state as? BackendState.Ready)?.port)
+        }
+        // Requests from FoldCode's VS Code extension (status bar item, "FoldCode: …" commands).
+        link = io.fold.vscode.VsCodeLink(rt) { cmd, _ ->
+            val i = Intent(this, SettingsActivity::class.java)
+            if (cmd == "github") i.putExtra(SettingsActivity.EXTRA_ACTION, SettingsActivity.ACTION_GITHUB)
+            if (cmd == "settings" || cmd == "github") startActivity(i)
         }
         setContentView(FrameLayout(this).apply {
             setBackgroundColor(Ui.BG)
@@ -225,15 +232,18 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        input.reloadPrefs()
         if (web.visibility == View.VISIBLE) web.requestFocus()
     }
 
     override fun onStart() {
         super.onStart()
         fold.start()
+        link.start()
     }
 
     override fun onStop() {
+        link.stop()
         fold.stop()
         super.onStop()
     }

@@ -100,6 +100,31 @@ class Runtime(private val ctx: Context) {
         profile.writeText("# Managed by the FoldCode app.\nexport TERMUX_PKG_NO_MIRROR_SELECT=1\n")
     }
 
+    /** True when FoldCode may read and write the phone's shared storage (All files access). */
+    val hasStorageAccess: Boolean get() = android.os.Environment.isExternalStorageManager()
+
+    /** ~/storage/{shared,downloads,documents,dcim,pictures,music,movies} → the phone's folders (like termux-setup-storage). */
+    fun setupStorageLinks() {
+        if (!hasStorageAccess) return
+        val root = android.os.Environment.getExternalStorageDirectory()
+        val dir = File(home, "storage").apply { mkdirs() }
+        val links = mapOf(
+            "shared" to root,
+            "downloads" to File(root, "Download"),
+            "documents" to File(root, "Documents"),
+            "dcim" to File(root, "DCIM"),
+            "pictures" to File(root, "Pictures"),
+            "music" to File(root, "Music"),
+            "movies" to File(root, "Movies"),
+        )
+        for ((name, target) in links) {
+            val link = File(dir, name)
+            if (!link.exists() && runCatching { Os.lstat(link.path) }.isFailure) {
+                runCatching { Os.symlink(target.path, link.path) }
+            }
+        }
+    }
+
     /** Environment for every process we start, modelled on the Termux app's shell environment. */
     fun env(): Map<String, String> {
         val e = linkedMapOf<String, String>()

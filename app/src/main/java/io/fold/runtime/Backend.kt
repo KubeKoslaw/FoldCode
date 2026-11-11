@@ -22,7 +22,7 @@ class Backend(private val rt: Runtime) {
     val executable get() = File(rt.prefix, "bin/code-server")
 
     /** Starts code-server; its output goes to [log]. Opens [folder] as the workspace. */
-    fun start(folder: File, log: File) {
+    fun start(folder: File, log: File, extraEnv: Map<String, String> = emptyMap()) {
         check(executable.exists()) { "code-server is not installed (${executable.path})" }
         val cmd = listOf(
             executable.path,
@@ -38,6 +38,7 @@ class Backend(private val rt: Runtime) {
             .redirectOutput(ProcessBuilder.Redirect.appendTo(log))
         pb.environment().clear()
         pb.environment().putAll(rt.env())
+        pb.environment().putAll(extraEnv)
         pb.environment()["PASSWORD"] = password
         process = pb.start().also { it.outputStream.close() }
     }

@@ -75,7 +75,11 @@ object BackendHolder {
             val b = Backend(rt)
             val log = logFile(ctx)
             if (log.length() > 2_000_000) log.delete()
-            b.start(File(rt.home, "projects").apply { mkdirs() }, log)
+            runCatching { io.fold.vscode.FoldExtension.ensureInstalled(ctx, rt) }.onFailure { Log.w(TAG, "extension install failed", it) }
+            rt.setupStorageLinks()
+            // VS Code's GitHub account (and git in its terminals) use the token from FoldCode's GitHub sign-in.
+            val env = buildMap { io.fold.github.GitHub(rt).token()?.let { put("GITHUB_TOKEN", it) } }
+            b.start(File(rt.home, "projects").apply { mkdirs() }, log, env)
             synchronized(this) { backend = b }
             if (!b.waitUntilHealthy()) {
                 publish(BackendState.Failed("VS Code backend didn't start (see the log)"))
@@ -104,6 +108,12 @@ object BackendHolder {
             publish(BackendState.Starting)
             startNow(ctx)
         }
+    }
+
+    /** Restart (e.g. after GitHub sign-in, so VS Code picks up the new token). */
+    fun restart(ctx: Context) {
+        stop()
+        ensureRunning(ctx)
     }
 
     @Synchronized

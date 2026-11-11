@@ -45,6 +45,10 @@ Desktop VS Code works the same way (Electron = a Chromium window + Node.js proce
 | Laptop mode (phase 5) | **Keyboard pinned on the bottom half + a trackpad strip under it** | Chosen. The trackpad is a virtual mouse: drag moves a pointer over the code, tap = left click, two-finger tap = right click, two-finger drag = scroll. It sends real `SOURCE_MOUSE` events, so VS Code gets hover, tooltips and context menus. |
 | Preview (phase 5) | **Opens by itself when a dev server starts**; code \| preview side by side (book mode: split at the hinge); folded: ⇄ swaps code and preview full screen | Chosen. `DevServerWatcher` checks the usual dev ports on 127.0.0.1 every 2 s. A preview the user closed stays closed until that server restarts. |
 | Code view scale (phase 5) | **Page scale pinned to 1** (viewport meta set by the bridge, WebView zoom off) | Measured on the emulator. After a fold/rotation narrowed the view, a too-wide element made Chromium zoom the whole page out (scale 0.74) and leave it there. |
+| GitHub sign-in (phase 6) | **GitHub CLI device flow from the FoldCode settings screen**: the one-time code is shown and copied, github.com/login/device opens in the browser | Chosen. `gh auth login --web --insecure-storage` (Android has no keyring; the token file stays in app-private storage), then `gh auth setup-git` for git push/pull. The backend gets the token as `GITHUB_TOKEN`, which code-server hands to VS Code's GitHub account; the backend restarts after sign-in and sign-out. |
+| Phone files (phase 6) | **All files access** (`MANAGE_EXTERNAL_STORAGE`) | Chosen: the whole shared storage, not single folders. `~/storage/{shared,downloads,documents,dcim,pictures,music,movies}` link to it (like `termux-setup-storage`); Download/Documents open as VS Code folders. |
+| AI agents (phase 6) | **Gemini CLI, Codex CLI, Cursor CLI and a musl-based agent CLI**, installed and started from the settings screen into a new VS Code terminal | Chosen. How each one can run differs (§14): plain npm, a native package, a musl runtime, the phase 7 glibc runner. |
+| FoldCode settings (phase 6) | **A small native screen** (GitHub, phone files, keyboard, notifications, AI agents, VS Code restart/log) | Chosen. Opened from a "FoldCode" item in VS Code's status bar (a built-in extension), the app icon's long-press menu and the gear on Android's App info page. |
 | App id / name | **`io.fold`**, display name **FoldCode** | The termux-packages wiki advises ≤ 10 characters because of Unix socket path limits under `/data/data/<id>`. **Permanent**: packages built for one id can't be moved to another. |
 | Paths on the phone | prefix `/data/data/io.fold/files/usr`, home `/data/data/io.fold/files/home` | Same layout as Termux, so its build recipes work unchanged. |
 | Extras | **Git + GitHub sign-in, access to phone files, AI CLI agents in the terminal** | Remote mode to the PC wasn't picked. |
@@ -264,20 +268,26 @@ scripts/serve-repo.sh           # serve out/repo to the phone over adb reverse
 - [ ] Per-posture VS Code layout (sidebar, panels, font) → backlog "small vs big screen"
 
 ### Phase 6 — Extras
-- [ ] Git + GitHub: `gh` device-flow sign-in from a button, `gh auth setup-git`, clone dialog
-- [ ] Phone files: All files access, `~/storage` symlinks, open folders from /sdcard, "Open with FoldCode" intents, a DocumentsProvider for home
-- [ ] AI CLI agents: global npm installs into the prefix, working node-gyp, test that popular agents start in the terminal, and list any that need glibc
+- [x] FoldCode settings screen (`SettingsActivity`) + built-in VS Code extension (`assets/foldcode-ext`): status bar item, "FoldCode: …" commands, file link to the app (§14)
+- [x] Git + GitHub: `gh` package, device-flow sign-in from the settings screen, `gh auth setup-git`, token passed to VS Code as `GITHUB_TOKEN`
+- [x] Phone files: All files access, `~/storage` symlinks, open Download/Documents in VS Code
+- [x] AI agents: one tap installs an agent and starts it in a new VS Code terminal (Gemini CLI via npm; Codex as a native package)
+- [x] Publish script uploads only new or changed packages
+- [ ] Codex native package (termux recipe; builds V8 from source, long build)
+- [ ] musl runtime package (resolver path patched for Android) for agents shipped as musl-linked binaries
+- [ ] Phone test: sign-in, `git push`, VS Code's GitHub account, phone folders, Gemini CLI, Codex
+- [ ] Clone dialog, "Open with FoldCode" intents, a DocumentsProvider for home
 - [ ] Language packs screen (one-tap install of `fold-*`)
 
 ### Backlog (feedback 2026-11-11, for later)
 - [ ] Small vs big screen: VS Code is hard to manage on the folded outer screen compared with the inner one. Per-screen VS Code layout (sidebar, panels, font, zoom), bigger touch targets.
 - [ ] Extension support: many extensions don't work yet (Open VSX only; glibc-only binaries). Ties into the phase 7 compat items.
 - [ ] Smoother keyboard: an animation when the code keyboard slides in and out.
-- [ ] Sign-in inside VS Code (Accounts menu: GitHub sign-in for extensions, settings sync) and to GitHub for git (phase 6 `gh` device flow). Microsoft's Settings Sync only works in Microsoft builds, so code-server needs its own route, e.g. GitHub-based sync or a settings repo.
+- [ ] Sign-in inside VS Code (Accounts menu: GitHub sign-in for extensions, settings sync) and to GitHub for git. GitHub part done in phase 6 (`gh` device flow, token passed to VS Code); still to check on the phone that the Accounts menu shows it. Microsoft's Settings Sync only works in Microsoft builds, so code-server needs its own route, e.g. GitHub-based sync or a settings repo.
 
 ### Phase 7 — Compatibility and polish
 - [ ] Extension path presets: clangd, rust-analyzer, ruff, gopls, lldb-dap
-- [ ] Optional glibc runner for glibc-only binaries
+- [ ] Optional glibc runner for glibc-only binaries (also needed by Cursor CLI)
 - [ ] MagicOS survival setup screen: battery, App launch, phantom processes
 - [ ] Performance pass: startup time, RAM, WebView GPU, battery drain
 - [ ] Release pipeline: signed APK on GitHub Releases, repo publish script, in-app update check
@@ -511,3 +521,28 @@ Bugs found and fixed:
 - **Page scale.** After narrowing, a fixed 80-column terminal (628 CSS px) made Chromium zoom the page to 0.74 and keep it there; `visualViewport.scale` showed it. Fixed: zoom/wide-viewport off on the code WebView, plus a scale-1 viewport meta from the bridge. Now `scale=1` and `innerWidth` = the view width in every posture.
 - **The ⇄ button blended into blue pages.** Added an outline and elevation.
 - **Kotlin `apply {}` scope, again (third time).** `layout` inside `TextView.apply` is the TextView's text layout. Use `this@FoldScreen.layout`.
+
+## 14. Phase 6 findings (2026-11-11)
+
+### AI agent CLIs on bionic
+
+| Agent | How it ships (linux arm64) | On FoldCode |
+|---|---|---|
+| Gemini CLI (`@google/gemini-cli` 0.68) | Plain JavaScript on npm | `npm install -g` into the prefix; should run on our Node |
+| Codex CLI 0.167 | npm wrapper around a static musl binary | The musl binary can't resolve DNS on Android (no `/etc/resolv.conf`). termux-packages has a native recipe (`codex`), so it becomes our own package |
+| Cursor CLI (2026.11.11) | Tarball with a glibc Node and a glibc native addon (`file_service.linux-arm64-gnu.node`) | Needs the phase 7 glibc runner |
+| musl-based agent CLIs (Bun single-file binaries) | Dynamically linked against `libc.musl-aarch64.so.1` only | Needs a musl runtime package with the resolver path patched, plus patchelf of the interpreter; the binary reads `/proc/self/exe`, so it must not be wrapped |
+
+### GitHub sign-in
+- Without a terminal, `gh auth login --web` prints `! One-time code (XXXX-XXXX) copied to clipboard` and the github.com/login/device URL, then polls. The app reads the code from that line. With `GH_BROWSER=true` gh doesn't try to open a browser itself; the app opens it.
+- `--insecure-storage` skips the keyring lookup (there is none on Android) and stores the token in `~/.config/gh/hosts.yml`, inside app-private storage.
+
+### VS Code ↔ app link
+- The built-in extension and the app talk through two folders in the home directory: `~/.foldcode/requests` (VS Code → app: open settings, start GitHub sign-in) and `~/.foldcode/to-vscode` (app → VS Code: open a terminal running a command, open a folder). Files are written under a dot name and renamed, so neither side reads half a message. Nothing goes over the network.
+- The `.vsix` is built at runtime from the assets and installed with `code-server --install-extension` when its version changes. Checked on the PC: the package installs into a throwaway VSCodium profile, and the extension logic passed a run against a stand-in `vscode` module (requests written; terminal and folder messages handled and removed).
+- The settings screen is also reachable from the app icon's long-press menu and from the gear on Android's App info page (an exported alias for `APPLICATION_PREFERENCES`). Only the app itself can start GitHub sign-in through it; the alias can't.
+
+### Emulator
+- The settings screen and All files access work on the emulator: the toggle grants access and `~/storage/*` links appear.
+- The full environment can't run there. The x86_64 image runs arm64 programs through its translation layer, which can't preload arm64 `termux-exec` (`CANNOT LINK EXECUTABLE … is for EM_AARCH64`), and multi-call coreutils fail (`Unable to get realpath of dirname`). VS Code on the emulator stays out of scope; it's tested on the phone.
+

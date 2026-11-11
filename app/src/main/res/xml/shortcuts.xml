@@ -3,6 +3,16 @@
     <shortcut
         android:enabled="true"
         android:icon="@mipmap/ic_launcher"
+        android:shortcutId="settings"
+        android:shortcutShortLabel="@string/settings">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="io.fold.SettingsActivity"
+            android:targetPackage="io.fold" />
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
         android:shortcutId="diagnostics"
         android:shortcutShortLabel="@string/diagnostics">
         <intent

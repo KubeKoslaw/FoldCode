@@ -34,7 +34,15 @@ class InputController(
     private val injector = KeyInjector(web)
     private val imm = activity.getSystemService(InputMethodManager::class.java)
 
+    /** Re-reads the settings screen's choices (default keyboard, vibration). */
+    fun reloadPrefs() {
+        kb.haptics = prefs.getBoolean("haptics", true)
+        val wanted = runCatching { Mode.valueOf(prefs.getString(PREF_MODE, Mode.CODE.name)!!) }.getOrDefault(Mode.CODE)
+        if (wanted != mode) setMode(wanted)
+    }
+
     fun attach() {
+        kb.haptics = prefs.getBoolean("haptics", true)
         kb.onKey = { key, alt -> handle(key, alt) }
         kb.onCursorStep = { step -> injector.key(if (step < 0) LEFT else RIGHT, metaNow()) }
         kb.latchOf = { latches[it] ?: Latch.OFF }

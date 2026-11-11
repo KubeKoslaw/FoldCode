@@ -1,0 +1,17 @@
+{
+  "name": "foldcode",
+  "displayName": "FoldCode",
+  "description": "Connects VS Code with the FoldCode Android app: settings, GitHub sign-in, phone folders.",
+  "publisher": "foldcode",
+  "version": "0.1.0",
+  "engines": { "vscode": "^1.80.0" },
+  "main": "./extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "contributes": {
+    "commands": [
+      { "command": "foldcode.settings", "title": "FoldCode: Settings" },
+      { "command": "foldcode.githubSignIn", "title": "FoldCode: Sign in to GitHub" },
+      { "command": "foldcode.openPhoneFolder", "title": "FoldCode: Open a phone folder" }
+    ]
+  }
+}

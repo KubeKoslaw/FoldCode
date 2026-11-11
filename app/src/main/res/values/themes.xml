@@ -16,6 +16,7 @@
     <string name="backend_running_text">Terminals and dev servers keep running in the background</string>
     <string name="stop">Stop</string>
     <string name="diagnostics">Diagnostics</string>
+    <string name="settings">Settings</string>
 
     <style name="Theme.Fold" parent="android:Theme.Material.NoActionBar">
         <item name="android:colorPrimary">@color/surface</item>

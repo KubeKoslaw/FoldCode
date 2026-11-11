@@ -53,7 +53,16 @@ echo "== release: stable (apt repo)"
 gh release view stable -R "$FULL" >/dev/null 2>&1 || \
     gh release create stable -R "$FULL" --target main --title "apt repository" \
         --notes "Flat apt repository for FoldCode. Source line: deb https://github.com/$FULL/releases/download/stable/ ./"
-gh release upload stable -R "$FULL" --clobber "$flat"/*
+# Upload only new or changed packages, then the index files (so the index never points at a
+# package that isn't uploaded yet).
+existing="$(gh release view stable -R "$FULL" --json assets --jq '.assets[] | "\(.name) \(.size)"')"
+debs=()
+for f in "$flat"/*.deb; do
+    grep -qxF "$(basename "$f") $(stat -c %s "$f")" <<<"$existing" || debs+=("$f")
+done
+echo "   ${#debs[@]} new or changed packages"
+[ ${#debs[@]} -eq 0 ] || gh release upload stable -R "$FULL" --clobber "${debs[@]}"
+gh release upload stable -R "$FULL" --clobber "$flat"/Packages "$flat"/Packages.gz "$flat"/Release "$flat"/Release.gpg "$flat"/InRelease
 # Remove assets that are no longer part of the repo.
 comm -13 <(ls "$flat" | sort) <(gh release view stable -R "$FULL" --json assets --jq '.assets[].name' | sort) | while read -r stale; do
     gh release delete-asset stable "$stale" -R "$FULL" -y
