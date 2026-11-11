@@ -114,6 +114,16 @@ class HostBridge(
               };
               Object.defineProperty(Navigator.prototype, 'clipboard', { get: () => clip, configurable: true });
 
+              // Keep the IDE at scale 1: an element wider than the view must not make Chromium
+              // zoom the whole page out (it happens after a fold/rotation makes the view narrower).
+              const pinScale = () => {
+                let m = document.querySelector('meta[name=viewport]');
+                if (!m) { m = document.createElement('meta'); m.name = 'viewport'; (document.head || document.documentElement).appendChild(m); }
+                const want = 'width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, interactive-widget=resizes-content';
+                if (m.content !== want) m.content = want;
+              };
+              if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', pinScale); else pinScale();
+
               // Tell the app when a text field has focus, so it can show its keys.
               const editable = (el) => !!el && (el.tagName === 'TEXTAREA' || el.isContentEditable ||
                 (el.tagName === 'INPUT' && !['button', 'checkbox', 'radio', 'submit', 'range', 'color', 'file', 'reset'].includes(el.type)) ||

@@ -10,7 +10,6 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.LinearLayout
 import androidx.webkit.WebViewAssetLoader
 import io.fold.HostBridge
 import io.fold.keys.InputController
@@ -28,6 +27,7 @@ class KeyboardDemoActivity : Activity() {
 
     private lateinit var web: WebView
     private lateinit var input: InputController
+    private lateinit var fold: io.fold.fold.FoldScreen
     private val handler = Handler(Looper.getMainLooper())
     private var logFile: File? = null
 
@@ -75,11 +75,18 @@ class KeyboardDemoActivity : Activity() {
         }
         log("bridge supported=${bridge.supported}")
         bridge.install(ORIGIN)
-        setContentView(LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(web, LinearLayout.LayoutParams(-1, 0, 1f))
-            addView(kb, LinearLayout.LayoutParams(-1, -2))
-        })
+        fold = io.fold.fold.FoldScreen(this, web, kb, input) { emptySet() }
+        fold.onPostureChanged = { r ->
+            log("posture ${r.posture} via ${r.source} hinge=${r.hinge?.toShortString()}")
+            handler.postDelayed(viewport, 2500)
+        }
+        setContentView(fold.layout)
+        intent.getStringExtra("posture")?.let { name ->
+            io.fold.fold.Posture.entries.firstOrNull { it.name == name }?.let {
+                fold.lockedPosture = io.fold.fold.PostureReading(it, "forced", null)
+                log("posture forced to $it")
+            }
+        }
         input.attach()
         web.isFocusableInTouchMode = true
         web.requestFocus()
@@ -93,6 +100,32 @@ class KeyboardDemoActivity : Activity() {
         }
         input.setNight((resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES)
         web.loadUrl("$ORIGIN/assets/spike/index.html")
+    }
+
+    override fun onStart() {
+        super.onStart()
+        fold.start()
+    }
+
+    override fun onStop() {
+        fold.stop()
+        super.onStop()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        fold.onConfigurationChanged()
+    }
+
+    override fun onDestroy() {
+        fold.destroy()
+        super.onDestroy()
+    }
+
+    private val viewport = Runnable {
+        web.evaluateJavascript("JSON.stringify({iw: innerWidth, ih: innerHeight, cw: document.documentElement.clientWidth, dpr: devicePixelRatio, vv: visualViewport && visualViewport.scale})") {
+            log("viewport view=${web.width}x${web.height} page=$it")
+        }
     }
 
     private val dump = Runnable {

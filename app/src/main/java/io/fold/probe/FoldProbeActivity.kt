@@ -24,6 +24,9 @@ import androidx.window.layout.FoldingFeature
 import androidx.window.layout.WindowInfoTracker
 import androidx.window.layout.WindowLayoutInfo
 import androidx.window.layout.WindowMetricsCalculator
+import io.fold.fold.PostureClassifier
+import io.fold.fold.PostureReading
+import io.fold.fold.Posture
 import io.fold.probe.Ui.addSpaced
 import io.fold.probe.Ui.dp
 import java.io.File

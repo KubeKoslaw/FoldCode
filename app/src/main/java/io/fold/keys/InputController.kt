@@ -71,6 +71,14 @@ class InputController(
         kb.night = night
     }
 
+    /** Laptop mode: keep the keys up even when no text field has focus. */
+    var pinned = false
+        set(value) {
+            field = value
+            if (value) collapsed = false
+            refresh()
+        }
+
     private fun refresh() {
         kb.rows = when (mode) {
             Mode.SYSTEM -> listOf(
@@ -84,7 +92,7 @@ class InputController(
                     if (layer == Layouts.SYMBOLS) Layouts.symbols else Layouts.letters
             }
         }
-        kb.visibility = if (editable) View.VISIBLE else View.GONE
+        kb.visibility = if (editable || pinned) View.VISIBLE else View.GONE
         kb.invalidate()
     }
 

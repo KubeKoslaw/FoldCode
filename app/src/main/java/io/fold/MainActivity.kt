@@ -46,6 +46,7 @@ class MainActivity : Activity() {
     private lateinit var bridge: HostBridge
     private lateinit var keyboard: io.fold.keys.KeyboardView
     private lateinit var input: io.fold.keys.InputController
+    private lateinit var fold: io.fold.fold.FoldScreen
     private lateinit var statusPanel: LinearLayout
     private lateinit var title: TextView
     private lateinit var message: TextView
@@ -109,17 +110,14 @@ class MainActivity : Activity() {
             addView(progress, LinearLayout.LayoutParams(-1, -2))
             addSpaced(actions, 0)
         }
-        val content = FrameLayout(this).apply {
-            setBackgroundColor(Ui.BG)
-            addView(web, FrameLayout.LayoutParams(-1, -1))
-            addView(ScrollView(context).apply { isFillViewport = true; addView(statusPanel) }, FrameLayout.LayoutParams(-1, -1))
+        // VS Code, the preview, the keys and (in laptop mode) the trackpad, arranged by fold posture.
+        fold = io.fold.fold.FoldScreen(this, web, keyboard, input) {
+            setOfNotNull((BackendHolder.state as? BackendState.Ready)?.port)
         }
-        // VS Code above, FoldCode's keys below (and above the system keyboard, thanks to adjustResize).
-        setContentView(LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
+        setContentView(FrameLayout(this).apply {
             setBackgroundColor(Ui.BG)
-            addView(content, LinearLayout.LayoutParams(-1, 0, 1f))
-            addView(keyboard, LinearLayout.LayoutParams(-1, -2))
+            addView(fold.layout, FrameLayout.LayoutParams(-1, -1))
+            addView(ScrollView(context).apply { isFillViewport = true; addView(statusPanel) }, FrameLayout.LayoutParams(-1, -1))
         })
         input.attach()
         applyTheme()
@@ -222,6 +220,7 @@ class MainActivity : Activity() {
             WebSettingsCompat.setForceDark(web.settings, if (night) WebSettingsCompat.FORCE_DARK_ON else WebSettingsCompat.FORCE_DARK_OFF)
         }
         input.setNight(night)
+        fold.setNight(night)
     }
 
     override fun onResume() {
@@ -229,8 +228,19 @@ class MainActivity : Activity() {
         if (web.visibility == View.VISIBLE) web.requestFocus()
     }
 
+    override fun onStart() {
+        super.onStart()
+        fold.start()
+    }
+
+    override fun onStop() {
+        fold.stop()
+        super.onStop()
+    }
+
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
+        fold.onConfigurationChanged()
         applyTheme()
     }
 
@@ -260,6 +270,7 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         BackendHolder.removeListener(listener)
         bridge.uninstall()
+        fold.destroy()
         web.destroy()
         super.onDestroy()
     }

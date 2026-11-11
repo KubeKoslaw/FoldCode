@@ -42,6 +42,9 @@ Desktop VS Code works the same way (Electron = a Chromium window + Node.js proce
 | Showing the keys (phase 4) | **Automatically while a text field is focused** | Chosen. The page reports focus and taps into text fields over the bridge, so a tap brings folded keys back and scrolling doesn't. |
 | Key feedback (phase 4) | **Vibration** (no sound) | Chosen. |
 | Hiding the system keyboard (phase 4) | **`FLAG_ALT_FOCUSABLE_IM` + `inputmode="none"` on focused fields + a one-frame window refocus** | Measured on the emulator. The window flag alone works only if set before the window has focus; switching at runtime let Chromium bring Gboard back. `inputmode="none"` (set by the page in code-keyboard mode) stops Chromium asking for the system keyboard while text input keeps working. |
+| Laptop mode (phase 5) | **Keyboard pinned on the bottom half + a trackpad strip under it** | Chosen. The trackpad is a virtual mouse: drag moves a pointer over the code, tap = left click, two-finger tap = right click, two-finger drag = scroll. It sends real `SOURCE_MOUSE` events, so VS Code gets hover, tooltips and context menus. |
+| Preview (phase 5) | **Opens by itself when a dev server starts**; code \| preview side by side (book mode: split at the hinge); folded: ⇄ swaps code and preview full screen | Chosen. `DevServerWatcher` checks the usual dev ports on 127.0.0.1 every 2 s. A preview the user closed stays closed until that server restarts. |
+| Code view scale (phase 5) | **Page scale pinned to 1** (viewport meta set by the bridge, WebView zoom off) | Measured on the emulator. After a fold/rotation narrowed the view, a too-wide element made Chromium zoom the whole page out (scale 0.74) and leave it there. |
 | App id / name | **`io.fold`**, display name **FoldCode** | The termux-packages wiki advises ≤ 10 characters because of Unix socket path limits under `/data/data/<id>`. **Permanent**: packages built for one id can't be moved to another. |
 | Paths on the phone | prefix `/data/data/io.fold/files/usr`, home `/data/data/io.fold/files/home` | Same layout as Termux, so its build recipes work unchanged. |
 | Extras | **Git + GitHub sign-in, access to phone files, AI CLI agents in the terminal** | Remote mode to the PC wasn't picked. |
@@ -251,17 +254,26 @@ scripts/serve-repo.sh           # serve out/repo to the phone over adb reverse
 - [ ] Default touch settings profile
 
 ### Phase 5 — Fold modes
-- [ ] PostureController → bridge → workbench contribution
-- [ ] Laptop mode: split at the hinge, workbench on top, CodeKeyboard + trackpad strip below (swappable to terminal/preview)
-- [ ] Seamless fold/unfold: no restarts, per-posture layout presets that remember tweaks
-- [ ] Split preview pane: divider, auto-open on a new dev-server port, reload, viewport toggle, optional Eruda
-- [ ] Book mode: editor | preview or terminal
+- [x] `PostureTracker`: WindowManager + hinge sensor, 400 ms debounce
+- [x] `FoldLayout` + `FoldScreen`: folded / flat / book / laptop layouts, split exactly at the hinge bounds, divider position remembered
+- [x] Laptop mode: code on the top half; keys pinned + trackpad strip (`TrackpadView`, `VirtualMouse`, `PointerOverlay`) on the bottom half
+- [x] Preview pane (`PreviewPane`) + `DevServerWatcher`: auto-open, reload, mobile/desktop width, open in browser, close
+- [x] Book mode: code + keys on the left half, preview on the right
+- [x] Emulator test of all layouts with a real HTTP server reached through `adb reverse` (results in §13)
+- [ ] Phone test with VS Code in every posture (needs your OK)
+- [ ] Per-posture VS Code layout (sidebar, panels, font) → backlog "small vs big screen"
 
 ### Phase 6 — Extras
 - [ ] Git + GitHub: `gh` device-flow sign-in from a button, `gh auth setup-git`, clone dialog
 - [ ] Phone files: All files access, `~/storage` symlinks, open folders from /sdcard, "Open with FoldCode" intents, a DocumentsProvider for home
 - [ ] AI CLI agents: global npm installs into the prefix, working node-gyp, test that popular agents start in the terminal, and list any that need glibc
 - [ ] Language packs screen (one-tap install of `fold-*`)
+
+### Backlog (feedback 2026-11-11, for later)
+- [ ] Small vs big screen: VS Code is hard to manage on the folded outer screen compared with the inner one. Per-screen VS Code layout (sidebar, panels, font, zoom), bigger touch targets.
+- [ ] Extension support: many extensions don't work yet (Open VSX only; glibc-only binaries). Ties into the phase 7 compat items.
+- [ ] Smoother keyboard: an animation when the code keyboard slides in and out.
+- [ ] Sign-in inside VS Code (Accounts menu: GitHub sign-in for extensions, settings sync) and to GitHub for git (phase 6 `gh` device flow). Microsoft's Settings Sync only works in Microsoft builds, so code-server needs its own route, e.g. GitHub-based sync or a settings repo.
 
 ### Phase 7 — Compatibility and polish
 - [ ] Extension path presets: clangd, rust-analyzer, ruff, gopls, lldb-dap
@@ -479,3 +491,23 @@ Bugs found and fixed on the way:
 - **A tap into an already focused editor fires no `focusin`, and Monaco swallows `click`.** Taps are now detected from short pointerdown/pointerup pairs (<10 px, <500 ms).
 - **Runtime mode switches:** `FLAG_ALT_FOCUSABLE_IM` alone didn't stop Gboard after a switch → added `inputmode="none"` and a one-frame `FLAG_NOT_FOCUSABLE` toggle. The toggle also makes Gboard appear right after switching to it.
 - Monaco 0.57 uses an **EditContext** element (`div.native-edit-context`), which the focus check treats as a text field.
+
+---
+
+## 13. Phase 5 findings (emulator, 2026-11-11)
+
+Run on the Pixel 9 Pro Fold emulator with `KeyboardDemoActivity` (same `FoldScreen` as the app). A test page was served from the PC and reached as 127.0.0.1:5173 through `adb reverse`.
+
+| Check | Result |
+|---|---|
+| Postures | FLAT → BOOK (hinge 90°) → LAPTOP (rotated) → FLAT, all from WindowManager with hinge bounds |
+| Laptop mode | Code on the top half, split at y=1038 (the hinge); keys pinned + trackpad on the bottom half |
+| Trackpad | The pointer moves and draws over the code; tap = click focused Monaco at the pointer; a key typed afterwards landed there |
+| Preview auto-open | Opened by itself within the 2 s check once port 5173 answered |
+| Flat / book | Code \| divider \| preview; in book mode, code + keys left of the hinge and preview right of it |
+| Folded (posture forced; the emulator can't move the app to an outer screen) | Code full screen + ⇄; ⇄ swaps to the preview and back |
+
+Bugs found and fixed:
+- **Page scale.** After narrowing, a fixed 80-column terminal (628 CSS px) made Chromium zoom the page to 0.74 and keep it there; `visualViewport.scale` showed it. Fixed: zoom/wide-viewport off on the code WebView, plus a scale-1 viewport meta from the bridge. Now `scale=1` and `innerWidth` = the view width in every posture.
+- **The ⇄ button blended into blue pages.** Added an outline and elevation.
+- **Kotlin `apply {}` scope, again (third time).** `layout` inside `TextView.apply` is the TextView's text layout. Use `this@FoldScreen.layout`.

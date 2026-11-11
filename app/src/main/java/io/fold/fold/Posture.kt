@@ -1,4 +1,4 @@
-package io.fold.probe
+package io.fold.fold
 
 import android.graphics.Rect
 import android.view.Surface
